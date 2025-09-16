@@ -1,0 +1,73 @@
+name:                fp2025
+version:             0.1.0.0
+github:              "vipo/fp-2025"
+license:             BSD-3-Clause
+author:              "Author name here"
+maintainer:          "example@example.com"
+copyright:           "2024 Author name here"
+
+extra-source-files:
+- README.md
+- CHANGELOG.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/githubuser/fp2024#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+
+ghc-options:
+- -Wall
+- -Wcompat
+- -Widentities
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+- -Wmissing-export-lists
+- -Wmissing-home-modules
+- -Wpartial-fields
+- -Wredundant-constraints
+
+library:
+  source-dirs: src
+  dependencies: []
+  when:
+  - condition: false
+    other-modules: Paths_fp2025
+
+executables:
+  fp2025-one:
+    main:                Main.hs
+    source-dirs:         app1
+    ghc-options:
+    - -rtsopts
+    dependencies:
+    - fp2025
+    - repline
+
+tests:
+  fp2024-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - fp2025
+    - tasty
+    - tasty-hunit
+  fp2025-doctest:
+    main:                Doctest.hs
+    source-dirs:         doctest
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - doctest
