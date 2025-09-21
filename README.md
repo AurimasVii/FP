@@ -81,9 +81,9 @@
                   |  "remove device " <device_name> " from room " <room_name>
 
    <set_command> ::= 
-                     "set " <device_name> " brightness " <value> 
-                  |  "set " <device_name> " temperature " <value> 
-                  |  "set " <device_name> " state " <state>
+                     "set " <device_name> " brightness to " <value> 
+                  |  "set " <device_name> " temperature to " <value> 
+                  |  "set " <device_name> " state to " <state>
 
    <rename_command> ::= 
                      "rename house " <old_name> " to " <new_name> 
