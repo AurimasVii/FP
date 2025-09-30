@@ -1,8 +1,7 @@
-module Lib1 ( examples, Command(..)) where
+module Lib1( examples, Command(..), Dumpable(..)) where
 
 data Dumpable = Examples
-instance Show Dumpable where
-  show Examples = "dump examples"
+  deriving Show
 
 -- This is a "root" ADT representing your grammar,
 -- Please expand this ADT as needed
