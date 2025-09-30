@@ -24,6 +24,8 @@ source-repository head
 
 library
   exposed-modules:
+      Lessons.Lesson01
+      Lessons.Lesson02
       Lessons.Lesson03
       Lib1
   hs-source-dirs:
