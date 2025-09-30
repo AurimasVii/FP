@@ -71,34 +71,44 @@
    | "dump examples"
 
    <add_command> ::= 
-                     "add house " <house_name> 
-                  |  "add a room " <room_name> " to " <house_name> 
-                  |  "add a device " <device_name> " to " <room_name>
+        "add house " <house_name> 
+      | "add room " <room_name> " to " <house_name> 
+      | "add device " <device_name> " to " <room_or_device_name>
 
    <remove_command> ::= 
-                     "remove house " <house_name> 
-                  |  "remove room " <room_name> " from house " <house_name> 
-                  |  "remove device " <device_name> " from room " <room_name>
+        "remove house " <house_name> 
+      | "remove room " <room_name> 
+      | "remove device " <device_name>
 
    <set_command> ::= 
-                     "set " <device_name> " brightness to " <value> 
-                  |  "set " <device_name> " temperature to " <value> 
-                  |  "set " <device_name> " state to " <state>
+        "set " <device_name> " brightness to " <value> 
+      | "set " <device_name> " temperature to " <value> 
+      | "set " <device_name> " state to " <state>
 
    <rename_command> ::= 
-                     "rename house " <old_name> " to " <new_name> 
-                  |  "rename room " <old_name> " to " <new_name> 
-                  |  "rename device " <old_name> " to " <new_name>
+        "rename house " <old_name> " to " <new_name> 
+      | "rename room " <old_name> " to " <new_name> 
+      | "rename device " <old_name> " to " <new_name>
 
    <control_command> ::= 
-                     "turn on " <device_name> 
-                  |  "turn off " <device_name>
+        "turn on " <device_name> 
+      | "turn off " <device_name>
 
    <schedule_command> ::= "schedule " <device_name> <action> " at " <value>
 
-   <report_command> ::= 
-                     "report room " <room_name> 
-                  |  "report house " <house_name>
+   <report_command> ::= <report_house>
+                   | <report_room>
+                   | <report_device>
+
+   <report_house> ::= "report house " <house_name> <report_list>
+   <report_room>  ::= "report room " <room_name> <report_list>
+   <report_device> ::= "report device " <device_name>
+
+   <report_list> ::= <report_command> <report_list> | <empty>
+   <empty> ::= "."
+
+
+
 
    <simulate_command> ::= "simulate day"
 
@@ -107,13 +117,15 @@
    <house_name> ::= <identifier>
    <room_name> ::= <identifier>
    <device_name> ::= <identifier>
+   <room_or_device_name> ::= <room_name> | <device_name>
    <old_name> ::= <identifier>
    <new_name> ::= <identifier> 
 
-   <identifier> ::= <uppercase_letter> <lowercase_letter>* <numeric>*
-   <uppercase_letter> ::= [A-Z]
-   <lowercase_letter> ::= [a-z]
-   <numeric> ::= [0-9]
-   <value> ::= <numeric> | <numeric> "." <numeric> <numeric>*
-   <action> ::= " turn on" | " turn off" | " set brightness" | " set temperature"
+   <identifier> ::= <letter> (<letter> | <digit>)*
+   <letter> ::= [A-Z] | [a-z]
+   <digit> ::= [0-9]
+
+   <value> ::= <digit>+ | <digit>+ "." <digit>+
+   <action> ::= "turn on" | "turn off" | "set brightness" | "set temperature"
+
 ```
