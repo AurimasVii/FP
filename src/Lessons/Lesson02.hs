@@ -25,8 +25,6 @@ f :: [Integer] -> Integer
 f [] = 0
 f (h:_) = h
 
-<<<<<<< HEAD
-=======
 -- | This pattern matching is dangerous, if only one-element list is
 -- provided to the function it throws an exception.
 --
@@ -38,65 +36,30 @@ f (h:_) = h
 --
 -- >>> f' [1,2]
 -- 1
->>>>>>> main-repo/main
 f' :: [Integer] -> Integer
 f' (h1:h2:_) = h1
 f' [] = 0
 
-<<<<<<< HEAD
-
-t1 :: (Integer, Char)
-t1 = (42, 'a')
-
-t2 :: (Integer, Int, String)
-t2 = (43, -1, "labas")
-
-trd :: (a, b, c) -> c
-trd (_, _, v) = v
-
--- f'' :: [a] -> a
--- f'' [] = 0
--- f'' (h:_) = h
-
-
--- ADT
-data FEType = A | B | C deriving Show
-data FireExtinguisher = FireExtinguisher Integer FEType deriving Show
-
-capacity :: FireExtinguisher -> Integer
-capacity (FireExtinguisher c _) = c
-
-refill :: FireExtinguisher -> FireExtinguisher
-refill (FireExtinguisher _ t) = FireExtinguisher 10 t
-
-=======
 -- | Let's implement our first recursive function! It calculates a length of
 -- a list (with elements of any type `a`).     
 --    
 -- This function is mathematically correct but it consumes stack space to keep
 -- intermediate "+" arguments. So this function will fail on "large" lists.
 --
->>>>>>> main-repo/main
 length' :: [a] -> Int
 length' [] = 0
 length' (_:t) = 1 + length' t
 
-<<<<<<< HEAD
-=======
 -- | To eliminate this drawback using a [Tail call optimization](https://en.wikipedia.org/wiki/Tail_call).
 -- We need the recursive call to be a final action of the function.
 --
 -- To achieve this we will have to introduce an additional parameter acc - accumulator where
 -- we will collect intermediate results (and not on a top of the stack).
->>>>>>> main-repo/main
 length'' :: [a] -> Int
 length'' l = length''' l 0
     where
         length''' :: [a] -> Int -> Int
         length''' [] acc = acc
-<<<<<<< HEAD
-        length''' (_:t) acc = length''' t (acc + 1)
-=======
         length''' (_:t) acc = length''' t (acc + 1)
 
 -- | Now let's switch to "data structures".
@@ -150,4 +113,3 @@ capacity (FireExtinguisher c _) = c
 -- | Usually you create new ADTs based on already existing ones.
 refill :: FireExtinguisher -> FireExtinguisher
 refill (FireExtinguisher _ t) = FireExtinguisher 10 t
->>>>>>> main-repo/main
