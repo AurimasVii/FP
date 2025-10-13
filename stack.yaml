@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 resolver: lts-22.44
 system-ghc: true
 packages:
+=======
+resolver: lts-22.44
+system-ghc: true
+packages:
+>>>>>>> main-repo/main
 - .

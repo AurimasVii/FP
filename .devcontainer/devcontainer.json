@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {
 	"image": "vipo/ghcup:9.6.7-1",
 	"customizations": {
@@ -13,3 +14,20 @@
 		"GHC_CHARENC": "GHC_NO_UNICODE"
 	}
 }
+=======
+{
+	"image": "vipo/ghcup:9.6.7-1",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"haskell.haskell",
+				"justusadam.language-haskell"
+			]
+		}
+	},
+	"containerEnv": {
+		"LC_ALL": "en_US.UTF-8",
+		"GHC_CHARENC": "GHC_NO_UNICODE"
+	}
+}
+>>>>>>> main-repo/main
