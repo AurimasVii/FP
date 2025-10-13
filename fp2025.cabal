@@ -27,14 +27,10 @@ library
       Lessons.Lesson01
       Lessons.Lesson02
       Lessons.Lesson03
-<<<<<<< HEAD
-      Lib1
-=======
       Lessons.Lesson04
       Lessons.Lesson05
       Lib1
       Lib2
->>>>>>> main-repo/main
   hs-source-dirs:
       src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints

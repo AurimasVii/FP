@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-module Lessons.Lesson02 (f,f',trd, FireExtinguisher(..), FEType(..),
-    capacity, refill, length', length'') where
-
-=======
 -- | In this lesson we will discuss two main topics: recursion and
 -- Algebraic Data Types (ADT).
 
@@ -26,7 +21,6 @@ module Lessons.Lesson02 (f,f',length', length'', t1, t2, trd, FireExtinguisher(.
 --
 -- >>> f [1,2,3]
 -- 1
->>>>>>> main-repo/main
 f :: [Integer] -> Integer
 f [] = 0
 f (h:_) = h
