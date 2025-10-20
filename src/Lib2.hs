@@ -12,6 +12,16 @@ import Data.Char (isAlpha, isDigit)
 type ErrorMsg = String
 type Parser a = String -> Either ErrorMsg (a, String)
 
+parseFull :: Parser a -> Parser a
+parseFull p input =
+  case p input of
+    Left e -> Left e
+    Right (result, rest) ->
+      let rest' = dropWhile (== ' ') rest
+      in if null rest'
+           then Right (result, "")
+           else Left ("Unconsumed input after command: '" ++ take 30 rest' ++ "'")
+
 parseDigit :: Parser Char
 parseDigit [] = Left " A digit is expected but got empty input"
 parseDigit (h:t)
@@ -291,7 +301,7 @@ parseSimulateCommand =
 -- | Parses user's input.
 -- The function must be implemented and must have tests.
 parseCommand :: Parser Lib1.Command
-parseCommand  = 
+parseCommand  = parseFull $
   parseDumpCommand
   `orElse` parseAddCommand
   `orElse` parseRemoveCommand
