@@ -57,13 +57,13 @@ parseState = orElse (using (keyword "On") (const Lib1.On))
 
 parseAction :: Parser Lib1.Action
 parseAction =
-  orElse (using (and4 (keyword "turn") (keyword " ") skipWhitespace (keyword "on"))
+  orElse (using (and4 (keyword "turn") (parseWhitespace) skipWhitespace (keyword "on"))
                 (const Lib1.TurnOnDevice))
-    (orElse (using (and4 (keyword "turn") (keyword " ")  skipWhitespace (keyword "off"))
+    (orElse (using (and4 (keyword "turn") (parseWhitespace)  skipWhitespace (keyword "off"))
                 (const Lib1.TurnOffDevice))
-      (orElse (using (and3 (keyword "set") (keyword " ")  (and2 skipWhitespace (keyword "brightness")))
+      (orElse (using (and3 (keyword "set") (parseWhitespace)  (and2 skipWhitespace (keyword "brightness")))
                 (const Lib1.SetBrightnessLevel))
-              (using (and3 (keyword "set") (keyword " ")  (and2 skipWhitespace (keyword "temperature")))
+              (using (and3 (keyword "set") (parseWhitespace)  (and2 skipWhitespace (keyword "temperature")))
                 (const Lib1.SetTemperatureLevel))))
 
 
@@ -86,6 +86,10 @@ parseDouble input =
               let numStr = intPart ++ "." ++ fracPart
               in Right (read numStr, rest3)
 
+parseWhitespace :: Parser String
+parseWhitespace input =
+  let (spaces, rest) = span (== ' ') input
+  in Right (spaces, rest)
 
 many :: Parser a -> Parser [a]
 many p input
@@ -204,7 +208,7 @@ and9 p1 p2 p3 p4 p5 p6 p7 p8 p9 input =
 parseDumpCommand :: Parser Lib1.Command
 parseDumpCommand =
   and3 (keyword "dump")
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "examples"))
     `using` (\(_, _, (_, _)) -> Lib1.Dump Lib1.Examples)
   -- and2 (keyword "dump") (and2 skipWhitespace (keyword "examples"))
@@ -214,9 +218,9 @@ parseDumpCommand =
 parseAddHouse :: Parser Lib1.Command
 parseAddHouse =
   and5 (keyword "add")
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "house"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
     `using` (\(_, _, (_, _), _, (_, name)) -> Lib1.Add (Lib1.AddHouse name))
   -- and3 (keyword "add") (and2 skipWhitespace (keyword "house")) (and2 skipWhitespace parseString)
@@ -224,13 +228,13 @@ parseAddHouse =
 parseAddRoom :: Parser Lib1.Command
 parseAddRoom =
   and9 (keyword "add")
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "room"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "to"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
     `using` (\(_, _, (_, _), _, (_, roomName), _, _, _, (_, houseName)) -> Lib1.Add (Lib1.AddRoom roomName houseName))
   -- and5 (keyword "add") (and2 skipWhitespace (keyword "room")) (and2 skipWhitespace parseString) (and2 skipWhitespace (keyword "to")) (and2 skipWhitespace parseString)
@@ -238,13 +242,13 @@ parseAddRoom =
 parseAddDevice :: Parser Lib1.Command
 parseAddDevice =
   and9 (keyword "add")
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "device"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "to"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
     `using` (\(_, _, (_, _), _, (_, deviceName), _, _, _, (_, roomName)) -> Lib1.Add (Lib1.AddDevice deviceName roomName))
   -- and5 (keyword "add") (and2 skipWhitespace (keyword "device")) (and2 skipWhitespace parseString) (and2 skipWhitespace (keyword "to")) (and2 skipWhitespace parseString)
@@ -260,9 +264,9 @@ parseAddCommand =
 parseRemoveHouse :: Parser Lib1.Command
 parseRemoveHouse =
   and5 (keyword "remove")
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "house"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
     `using` (\(_, _, (_, _), _, (_, houseName)) -> Lib1.Remove (Lib1.RemoveHouse houseName))
   -- and3 (keyword "remove") (and2 skipWhitespace (keyword "house")) (and2 skipWhitespace parseString)
@@ -270,13 +274,13 @@ parseRemoveHouse =
 parseRemoveRoom :: Parser Lib1.Command
 parseRemoveRoom =
   and9 (keyword "remove")
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "room"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "from"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
     `using` (\(_, _, (_, _), _, (_, roomName), _, _, _, (_, houseName)) -> Lib1.Remove (Lib1.RemoveRoom roomName houseName))
   -- and5 (keyword "remove") (and2 skipWhitespace (keyword "room")) (and2 skipWhitespace parseString) (and2 skipWhitespace (keyword "from")) (and2 skipWhitespace parseString)
@@ -284,13 +288,13 @@ parseRemoveRoom =
 parseRemoveDevice :: Parser Lib1.Command
 parseRemoveDevice =
   and9 (keyword "remove")
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "device"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "from"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
     `using` (\(_, _, (_, _), _, (_, deviceName), _, _, _, (_, roomName)) -> Lib1.Remove (Lib1.RemoveDevice deviceName roomName))
   -- and5 (keyword "remove") (and2 skipWhitespace (keyword "device")) (and2 skipWhitespace parseString) (and2 skipWhitespace (keyword "from")) (and2 skipWhitespace parseString)
@@ -304,13 +308,13 @@ parseRemoveCommand =
 parseRenameHouse :: Parser Lib1.Command
 parseRenameHouse =
   and9 (keyword "rename")
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "house"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "to"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
     `using` (\(_, _, (_, _), _, (_, oldName), _, _, _, (_, newName)) -> Lib1.Rename (Lib1.RenameHouse oldName newName))
   -- and5 (keyword "rename") (and2 skipWhitespace (keyword "house")) (and2 skipWhitespace parseString) (and2 skipWhitespace (keyword "to")) (and2 skipWhitespace parseString)
@@ -318,13 +322,13 @@ parseRenameHouse =
 parseRenameRoom :: Parser Lib1.Command
 parseRenameRoom =
   and9 (keyword "rename")
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "room"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "to"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
     `using` (\(_, _, (_, _), _, (_, oldName), _, _, _, (_, newName)) -> Lib1.Rename (Lib1.RenameRoom oldName newName))
   -- and5 (keyword "rename") (and2 skipWhitespace (keyword "room")) (and2 skipWhitespace parseString) (and2 skipWhitespace (keyword "to")) (and2 skipWhitespace parseString)
@@ -332,13 +336,13 @@ parseRenameRoom =
 parseRenameDevice :: Parser Lib1.Command
 parseRenameDevice =
   and9 (keyword "rename")
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "device"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "to"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
     `using` (\(_, _, (_, _), _, (_, oldName), _, _, _, (_, newName)) -> Lib1.Rename (Lib1.RenameDevice oldName newName))
   -- and5 (keyword "rename") (and2 skipWhitespace (keyword "device")) (and2 skipWhitespace parseString) (and2 skipWhitespace (keyword "to")) (and2 skipWhitespace parseString)
@@ -353,11 +357,11 @@ parseRenameCommand =
 parseSetBrightness :: Parser Lib1.Command
 parseSetBrightness =
   and7 (keyword "set")
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "brightness"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseDouble)
     `using` (\(_, _, (_, deviceName), _, (_, _), _, (_, brightness)) -> Lib1.Set (Lib1.SetBrightness deviceName brightness))
   -- and4 (keyword "set") (and2 skipWhitespace parseString) (and2 skipWhitespace (keyword "brightness")) (and2 skipWhitespace parseDouble)
@@ -365,11 +369,11 @@ parseSetBrightness =
 parseSetTemperature :: Parser Lib1.Command
 parseSetTemperature =
   and7 (keyword "set")
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "temperature"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseDouble)
     `using` (\(_, _, (_, deviceName), _, (_, _), _, (_, temperature)) -> Lib1.Set (Lib1.SetTemperature deviceName temperature))
   -- and4 (keyword "set") (and2 skipWhitespace parseString) (and2 skipWhitespace (keyword "temperature")) (and2 skipWhitespace parseDouble)
@@ -378,11 +382,11 @@ parseSetTemperature =
 parseSetState :: Parser Lib1.Command
 parseSetState =
   and7 (keyword "set")
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "state"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseState)
     `using` (\(_, _, (_, deviceName), _, (_, _), _, (_, state)) -> Lib1.Set (Lib1.SetState deviceName state))
   -- and4 (keyword "set") (and2 skipWhitespace parseString) (and2 skipWhitespace (keyword "state")) (and2 skipWhitespace parseState)
@@ -398,9 +402,9 @@ parseSetCommand =
 parseTurnOn :: Parser Lib1.Command
 parseTurnOn =
   and5 (keyword "turn")
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "on"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
   `using` (\(_, _, (_, _), _, (_, deviceName)) -> Lib1.Control (Lib1.TurnOn deviceName))
   -- and2 (keyword "turn on") (and2 skipWhitespace parseString)
@@ -408,9 +412,9 @@ parseTurnOn =
 parseTurnOff :: Parser Lib1.Command
 parseTurnOff =
   and5 (keyword "turn")
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "off"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
   `using` (\(_, _, (_, _), _, (_, deviceName)) -> Lib1.Control (Lib1.TurnOff deviceName))
   -- and2 (keyword "turn off") (and2 skipWhitespace parseString)
@@ -423,11 +427,11 @@ parseControlCommand =
 parseScheduleCommand :: Parser Lib1.Command
 parseScheduleCommand =
   and7 (keyword "schedule")
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseAction)
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseDouble)
     `using` (\(_, _, (_, deviceName), _, (_, action), _, (_, time)) ->
       Lib1.Schedule (Lib1.ScheduleAt deviceName action time))
@@ -453,11 +457,11 @@ parseReportList input =
 parseReportHouse :: Parser Lib1.Command
 parseReportHouse =
   and7 (keyword "report")
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "house"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
-       (keyword " ")
+       (parseWhitespace)
        parseReportList
     `using` (\(_, _, (_, _), _, (_, houseName), _, reportList) ->
       Lib1.Report (Lib1.ReportHouse houseName reportList))
@@ -468,11 +472,11 @@ parseReportHouse =
 parseReportRoom :: Parser Lib1.Command
 parseReportRoom =
   and7 (keyword "report")
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "room"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
-       (keyword " ")
+       (parseWhitespace)
        parseReportList
     `using` (\(_, _, (_, _), _, (_, roomName), _, reportList) ->
       Lib1.Report (Lib1.ReportRoom roomName reportList))
@@ -482,9 +486,9 @@ parseReportRoom =
 parseReportDevice :: Parser Lib1.Command
 parseReportDevice =
   and5 (keyword "report")
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace (keyword "device"))
-       (keyword " ")
+       (parseWhitespace)
        (and2 skipWhitespace parseString)
     `using` (\(_, _, (_, _), _, (_, deviceName)) -> Lib1.Report (Lib1.ReportDevice deviceName))
   -- and2 (keyword "report device") (and2 skipWhitespace parseString)
