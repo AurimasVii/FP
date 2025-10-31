@@ -72,19 +72,31 @@ parseString input =
   case many1 parseChar input of
     Left e -> Left e
     Right (chars, rest) -> Right (chars, rest)
+
 parseDouble :: Parser Double
-parseDouble input =
-  case many1 parseDigit input of
-    Left e -> Left e
-    Right (intPart, rest1) ->
-      case keyword "." rest1 of
-        Left _ -> Right (read intPart, rest1)
-        Right (_, rest2) ->
-          case many1 parseDigit rest2 of
-            Left e -> Left e
-            Right (fracPart, rest3) ->
-              let numStr = intPart ++ "." ++ fracPart
-              in Right (read numStr, rest3)
+parseDouble =
+  orElse parseDecimal parseInteger
+
+parseDecimal :: Parser Double
+parseDecimal =
+  and3 parseNumber (keyword ".") parseNumber
+    `using` (\(intPart, _, fracPart) -> read (show intPart ++ "." ++ show fracPart))
+  -- case and3 parseNumber (keyword ".") parseNumber inp of
+  --   Left e -> Left e
+  --   Right ((intPart, _, fracPart), rest) ->
+  --     Right (read (show intPart ++ "." ++ show fracPart), rest)
+parseInteger:: Parser Double
+parseInteger =
+  using parseNumber fromIntegral
+  -- case parseNumber inp of
+  --   Left e -> Left e
+  --   Right (intVal, rest) -> Right (fromIntegral intVal, rest)
+
+--parseDouble  = 
+  -- and3 (parseNumber)
+  --      (keyword ".")
+  --      (parseNumber)
+  --   `using` (\(inP, _, fracP) -> read (show inP ++ "." ++ show fracP)) `orElse` parseNumber `using` (\(a) -> read(show a))
 
 parseWhitespace :: Parser String
 parseWhitespace input =
@@ -179,10 +191,10 @@ and6 p1 p2 p3 p4 p5 p6 input =
     Right ((v1, v2, v3, v4, v5), rest) ->
       case p6 rest of
         Left e -> Left e
-        Right (v6, rest') -> Right ((v1, v2, v3, v4, v5, v6), rest') 
+        Right (v6, rest') -> Right ((v1, v2, v3, v4, v5, v6), rest')
 and7 :: Parser a -> Parser b -> Parser c -> Parser d -> Parser e -> Parser f -> Parser g -> Parser (a, b, c, d, e, f, g)
 and7 p1 p2 p3 p4 p5 p6 p7 input =
-  case and6 p1 p2 p3 p4 p5 p6 input of  
+  case and6 p1 p2 p3 p4 p5 p6 input of
     Left e -> Left e
     Right ((v1, v2, v3, v4, v5, v6), rest) ->
       case p7 rest of
@@ -190,7 +202,7 @@ and7 p1 p2 p3 p4 p5 p6 p7 input =
         Right (v7, rest') -> Right ((v1, v2, v3, v4, v5, v6, v7), rest')
 and8 :: Parser a -> Parser b -> Parser c -> Parser d -> Parser e -> Parser f -> Parser g -> Parser h -> Parser (a, b, c, d, e, f, g, h)
 and8 p1 p2 p3 p4 p5 p6 p7 p8 input =
-  case and7 p1 p2 p3 p4 p5 p6 p7 input of  
+  case and7 p1 p2 p3 p4 p5 p6 p7 input of
     Left e -> Left e
     Right ((v1, v2, v3, v4, v5, v6, v7), rest) ->
       case p8 rest of
@@ -198,12 +210,12 @@ and8 p1 p2 p3 p4 p5 p6 p7 p8 input =
         Right (v8, rest') -> Right ((v1, v2, v3, v4, v5, v6, v7, v8), rest')
 and9 :: Parser a -> Parser b -> Parser c -> Parser d -> Parser e -> Parser f -> Parser g -> Parser h -> Parser i -> Parser (a, b, c, d, e, f, g, h, i)
 and9 p1 p2 p3 p4 p5 p6 p7 p8 p9 input =
-  case and8 p1 p2 p3 p4 p5 p6 p7 p8 input of  
+  case and8 p1 p2 p3 p4 p5 p6 p7 p8 input of
     Left e -> Left e
     Right ((v1, v2, v3, v4, v5, v6, v7, v8), rest) ->
       case p9 rest of
         Left e -> Left e
-        Right (v9, rest') -> Right ((v1, v2, v3, v4, v5, v6, v7, v8, v9), rest')        
+        Right (v9, rest') -> Right ((v1, v2, v3, v4, v5, v6, v7, v8, v9), rest')
 
 parseDumpCommand :: Parser Lib1.Command
 parseDumpCommand =
