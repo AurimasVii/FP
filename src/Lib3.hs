@@ -408,11 +408,38 @@ simulate = (\_ _ _ _ -> Lib1.Simulate Lib1.SimulateDay)
 
 -- | You can change the type to whatever needed. If your domain
 -- does not have any state you have to make it up.
-newtype State = State ()
+data State = State {
+  houses :: [House],
+  schedules :: [ScheduleItem]
+} deriving Show
+
+data House = House {
+  houseName :: String,
+  rooms :: [Room]
+} deriving Show
+
+data Room = Room {
+  roomName :: String,
+  devices :: [Device]
+} deriving Show
+
+data Device = Device {
+  deviceName :: String,
+  deviceStatus :: Lib1.State,
+  deviceBrightness :: Maybe Double,
+  deviceTemperature :: Maybe Double
+} deriving Show
+
+data ScheduleItem = ScheduleItem {
+  targetedDevice :: String,
+  action :: Lib1.Action,
+  time :: Double
+} deriving Show
 
 -- Fix this accordingly
 emptyState :: State
-emptyState = State()
+emptyState = State [] []
+
 
 -- | Business/domain logic happens here.
 -- This function makes your program actually usefull.
