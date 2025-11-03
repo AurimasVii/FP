@@ -6,11 +6,11 @@ module Lib3(
 
 import qualified Lib1
 
-import Control.Concurrent.STM.TVar(TVar)
+import Control.Concurrent.STM
 import Control.Concurrent (Chan, readChan)
 import Control.Applicative
 import Data.Char (isAlpha, isDigit)
-import Data.List (isPrefixOf)
+import Data.List (isPrefixOf, sortBy)
 
 newtype Parser a = Parser {
     runParser :: String -> Either String (a, String)
@@ -406,6 +406,34 @@ simulate = (\_ _ _ _ -> Lib1.Simulate Lib1.SimulateDay)
     <*> skipWhitespace
     <*> parseKeyword "day"
 
+simulateDay :: State -> State
+simulateDay st =
+  let orderedSchedules = sortBy (\a b -> compare (time a) (time b)) (schedules st)
+      newHouses = foldl (\hs sched -> houses (applySchedule sched (st { houses = hs }))) (houses st) orderedSchedules
+  in st { houses = newHouses, schedules = [] } 
+applySchedule :: ScheduleItem -> State -> State
+applySchedule sched st =
+  let dName = targetedDevice sched
+      act   = action sched
+      updateDevice d
+        | deviceName d == dName = applyActionToDevice act d
+        | otherwise              = d
+      updateRoom r = r { devices = map updateDevice (devices r) }
+      updateHouse h = h { rooms = map updateRoom (rooms h) }
+  in st { houses = map updateHouse (houses st) }
+applyActionToDevice :: Lib1.Action -> Device -> Device
+applyActionToDevice Lib1.TurnOnDevice d = d { deviceStatus = Lib1.On }
+applyActionToDevice Lib1.TurnOffDevice d = d { deviceStatus = Lib1.Off }
+applyActionToDevice Lib1.SetBrightnessLevel d =
+  d { deviceBrightness = Just 0} 
+applyActionToDevice Lib1.SetTemperatureLevel d =
+  d { deviceTemperature = Just 0 } 
+printSchedule :: ScheduleItem -> IO ()
+printSchedule s = putStrLn $
+  " - At " ++ show (time s) ++
+  ": " ++ show (action s) ++
+  " on device \"" ++ targetedDevice s ++ "\""
+
 -- | You can change the type to whatever needed. If your domain
 -- does not have any state you have to make it up.
 data State = State {
@@ -448,7 +476,189 @@ emptyState = State [] []
 -- SINGLE atomically call in the function
 -- You do not want to write/read files here.
 execute :: TVar State -> Lib1.Command -> IO ()
-execute _ _ = error "Implement me 1"
+execute stateVar command = case command of 
+
+  Lib1.Add (Lib1.AddHouse hName) -> atomically $ do
+    st <- readTVar stateVar
+    let newHouse = House hName []
+        newState = st { houses = newHouse : houses st }
+    writeTVar stateVar newState
+  Lib1.Add (Lib1.AddRoom rName hName) -> atomically $ do
+      st <- readTVar stateVar
+      let updateHouse h 
+            |houseName h == hName = h {rooms = Room rName [] : rooms h}
+            | otherwise = h
+          newState = st {houses = map updateHouse (houses st)}
+      writeTVar stateVar newState 
+  Lib1.Add (Lib1.AddDevice dName rName) -> atomically $ do
+      st <- readTVar stateVar
+      let updateRoom r
+            | roomName r == rName = r {devices = Device dName Lib1.Off Nothing Nothing : devices r}
+            | otherwise = r
+          updateHouse h = h {rooms = map updateRoom (rooms h)}
+          newState = st {houses = map updateHouse (houses st)}
+      writeTVar stateVar newState
+  
+  Lib1.Remove (Lib1.RemoveHouse hName) -> atomically $ do 
+      st <- readTVar stateVar
+      let houseDel = filter ((/= hName) . houseName) (houses st)
+          newState = st {houses = houseDel}
+      writeTVar stateVar newState
+  Lib1.Remove (Lib1.RemoveRoom rName hName) -> atomically $ do
+      st <- readTVar stateVar
+      let updateHouse h
+            | houseName h == hName =
+                h { rooms = filter ((/= rName) . roomName) (rooms h) }
+            | otherwise = h
+          newState = st { houses = map updateHouse (houses st) }
+      writeTVar stateVar newState
+  Lib1.Remove (Lib1.RemoveDevice dName rName) -> atomically $ do
+      st <-readTVar stateVar
+      let updateRoom r
+            | roomName r == rName = r {devices = filter((/= dName) . deviceName) (devices r)}
+            | otherwise = r
+          updateHouse h = h {rooms = map updateRoom (rooms h)}
+          newState = st {houses = map updateHouse (houses st)}
+      writeTVar stateVar newState
+
+  Lib1.Set (Lib1.SetBrightness dName val) -> atomically $ do
+      st <- readTVar stateVar
+      let updateDevice d
+            | deviceName d == dName = d { deviceBrightness = Just val }
+            | otherwise = d
+          updateRoom r = r {devices = map updateDevice (devices r)}
+          updateHouse h = h {rooms = map updateRoom (rooms h)}
+          newState = st {houses = map updateHouse (houses st)}
+      writeTVar stateVar newState
+  Lib1.Set (Lib1.SetTemperature dName val) -> atomically $ do
+      st <- readTVar stateVar
+      let updateDevice d
+            | deviceName d == dName = d { deviceTemperature = Just val}
+            | otherwise = d
+          updateRoom r = r {devices = map updateDevice (devices r)}
+          updateHouse h = h {rooms = map updateRoom (rooms h)}
+          newState = st {houses = map updateHouse (houses st)}
+      writeTVar stateVar newState
+  Lib1.Set (Lib1.SetState dName state) -> atomically $ do
+      st <- readTVar stateVar
+      let updateDevice d
+            | deviceName d == dName = d { deviceStatus = state}
+            | otherwise = d
+          updateRoom r = r {devices = map updateDevice (devices r)}
+          updateHouse h = h {rooms = map updateRoom (rooms h)}
+          newState = st {houses = map updateHouse (houses st)}
+      writeTVar stateVar newState
+  
+  Lib1.Rename (Lib1.RenameHouse oldName newName) -> atomically $ do
+      st <- readTVar stateVar
+      let updateHouse h
+            | houseName h == oldName = h {houseName = newName}
+            | otherwise = h
+          newState = st {houses = map updateHouse(houses st)}
+      writeTVar stateVar newState
+  Lib1.Rename (Lib1.RenameRoom oldName newName) -> atomically $ do
+      st <- readTVar stateVar
+      let updateRoom r 
+            | roomName r == oldName = r {roomName = newName}
+            | otherwise = r
+          updateHouse h = h {rooms = map updateRoom (rooms h)}
+          newState = st {houses = map updateHouse (houses st)}
+      writeTVar stateVar newState
+  Lib1.Rename (Lib1.RenameDevice oldName newName) -> atomically $ do
+      st <- readTVar stateVar
+      let updateDevice d
+            | deviceName d == oldName = d {deviceName = newName}
+            | otherwise = d
+          updateRoom r = r {devices = map updateDevice (devices r)}
+          updateHouse h = h {rooms = map updateRoom (rooms h)}
+          newState = st {houses = map updateHouse (houses st)}
+      writeTVar stateVar newState
+
+  Lib1.Control (Lib1.TurnOn dName) -> atomically $ do
+      st <- readTVar stateVar
+      let updateDevice d
+            | deviceName d == dName = d {deviceStatus = Lib1.On}
+            | otherwise = d
+          updateRoom r = r {devices = map updateDevice (devices r)}
+          updateHouse h = h {rooms = map updateRoom (rooms h)}
+          newState = st {houses = map updateHouse (houses st)}
+      writeTVar stateVar newState
+  Lib1.Control (Lib1.TurnOff dName) -> atomically $ do
+      st <- readTVar stateVar
+      let updateDevice d
+            | deviceName d == dName = d {deviceStatus = Lib1.Off}
+            | otherwise = d
+          updateRoom r = r {devices = map updateDevice (devices r)}
+          updateHouse h = h {rooms = map updateRoom (rooms h)}
+          newState = st {houses = map updateHouse (houses st)}
+      writeTVar stateVar newState
+
+  Lib1.Schedule (Lib1.ScheduleAt dName actionNew timeNew) -> atomically $ do
+    st <- readTVar stateVar
+    let newItem = ScheduleItem {
+                    targetedDevice = dName,
+                    action = actionNew,
+                    time = timeNew
+                  }
+        newState = st {schedules = newItem : schedules st}
+    writeTVar stateVar newState
+
+  Lib1.Report (Lib1.ReportHouse hName _) -> do
+    st <- readTVarIO stateVar
+    case filter ((== hName) . houseName) (houses st) of
+      [] -> putStrLn $ "No such house: " ++ hName
+      (h:_) -> do
+        putStrLn $ "House: " ++ houseName h
+        mapM_ (\r -> do
+          putStrLn $ "  Room: " ++ roomName r
+          mapM_ (\d ->
+            putStrLn $
+              "    Device: " ++ deviceName d ++
+              " [" ++ show (deviceStatus d) ++
+              maybe "" (\b -> ", Brightness=" ++ show b) (deviceBrightness d) ++
+              maybe "" (\t -> ", Temperature=" ++ show t) (deviceTemperature d) ++ "]"
+            ) (devices r)
+          ) (rooms h)
+  Lib1.Report (Lib1.ReportRoom rName _) -> do
+    st <- readTVarIO stateVar
+    let allRooms = concatMap rooms (houses st)
+    case filter ((== rName) . roomName) allRooms of
+      [] -> putStrLn $ "No such room: " ++ rName
+      (r:_) -> do
+        putStrLn $ "Room: " ++ roomName r
+        mapM_ (\d ->
+          putStrLn $
+            "  Device: " ++ deviceName d ++
+            " [" ++ show (deviceStatus d) ++
+            maybe "" (\b -> ", Brightness=" ++ show b) (deviceBrightness d) ++
+            maybe "" (\t -> ", Temperature=" ++ show t) (deviceTemperature d) ++ "]"
+          ) (devices r)
+  Lib1.Report (Lib1.ReportDevice dName) -> do
+    st <- readTVarIO stateVar
+    let allDevices = concatMap devices (concatMap rooms (houses st))
+    case filter ((== dName) . deviceName) allDevices of
+      [] -> putStrLn $ "No such device: " ++ dName
+      (d:_) -> putStrLn $
+        "Device: " ++ deviceName d ++
+        " [" ++ show (deviceStatus d) ++
+        maybe "" (\b -> ", Brightness=" ++ show b) (deviceBrightness d) ++
+        maybe "" (\t -> ", Temperature=" ++ show t) (deviceTemperature d) ++ "]"
+        
+  Lib1.Simulate Lib1.SimulateDay -> do
+      st <- readTVarIO stateVar
+      if null (schedules st)
+        then putStrLn "No scheduled actions to simulate."
+        else do
+          putStrLn "Simulating day"
+          -- Sort schedules by time before applying
+          let orderedSchedules = sortBy (\a b -> compare (time a) (time b)) (schedules st)
+          mapM_ printSchedule orderedSchedules
+          let updatedState = simulateDay st
+          atomically $ writeTVar stateVar updatedState
+          putStrLn "Simulation complete. All scheduled actions have been applied."
+  
+
+  _ -> putStrLn "Command not implemented" 
 
 data StorageOp = Save String (Chan ()) | Load (Chan String)
 -- | This function is started from main
