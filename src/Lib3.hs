@@ -11,6 +11,10 @@ import Control.Concurrent (Chan, readChan)
 import Control.Applicative
 import Data.Char (isAlpha, isDigit)
 import Data.List (isPrefixOf, sortBy)
+import Control.Exception
+import Control.Monad
+import Control.Concurrent.Chan
+import System.IO.Error
 
 newtype Parser a = Parser {
     runParser :: String -> Either String (a, String)
@@ -434,6 +438,9 @@ printSchedule s = putStrLn $
   ": " ++ show (action s) ++
   " on device \"" ++ targetedDevice s ++ "\""
 
+stateFile :: String
+stateFile = "state.txt"
+
 -- | You can change the type to whatever needed. If your domain
 -- does not have any state you have to make it up.
 data State = State {
@@ -668,9 +675,24 @@ data StorageOp = Save String (Chan ()) | Load (Chan String)
 -- to a channel provided in a request. It must run forever.
 -- Modify as needed.
 storageOpLoop :: Chan StorageOp -> IO ()
-storageOpLoop c = do
-  _ <- readChan c
-  return $ error "Implement me 2"
+storageOpLoop chan = forever $ do
+  op <- readChan chan
+  case op of
+    Save content doneChan -> do
+      e <- try (writeFile stateFile content) :: IO (Either IOException ())
+      case e of
+        Left err -> putStrLn $ "Save error: " ++ show err
+        Right _ -> return ()
+      writeChan doneChan ()
+
+    Load replyChan -> do
+      e <- try (readFile stateFile) :: IO (Either IOException String)
+      case e of
+        Right txt -> writeChan replyChan txt
+        Left err ->
+          if isDoesNotExistError err
+            then writeChan replyChan ""
+            else writeChan replyChan $ "ERROR: " ++ show err
 
 -- | This function will be called periodically
 -- and on programs' exit. File writes must be performed
