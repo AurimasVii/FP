@@ -60,7 +60,7 @@ instance Alternative Parser where
         Left e1 ->
             case runParser p2 input of
                 Right r2 -> Right r2
-                Left e2 -> Left $ e1 ++ "; " ++ e2 
+                Left e2 -> Left $ e1 ++ "; " ++ e2
 
 parseKeyword :: String -> Parser String
 parseKeyword kw = Parser $ \input ->
@@ -93,18 +93,20 @@ parseDigit = Parser $ \case
   (x:_) -> Left ("Unexpected char: " ++ [x])
 
 parseDouble :: Parser Double
-parseDouble = ((\intPart _ fracPart -> read(intPart ++ "." ++ fracPart))
+parseDouble = ((\intPart _ fracPart -> read (intPart ++ "." ++ fracPart))
     <$> some parseDigit
     <*> parseKeyword "."
     <*> some parseDigit)
   <|> (read <$> some parseDigit)
 
+-- BNF: <state> ::= "on" || "off"
 parseState :: Parser Lib1.State
 parseState = (Lib1.On <$ parseKeyword "on")
          <|> (Lib1.Off <$ parseKeyword "off")
 
+-- BNF: <action> ::= "turn on" | "turn off" | "set brightness" | "set temperature"
 parseAction :: Parser Lib1.Action
-parseAction = 
+parseAction =
   ((\_ _ _ -> Lib1.TurnOnDevice)
     <$> parseKeyword "turn"
     <*> parseSpaces
@@ -125,7 +127,16 @@ parseAction =
 parseReportList :: Parser [Lib1.ReportCommand]
 parseReportList = many (skipWhitespace *> (reportHouse <|> reportRoom <|> reportDevice))
 
-
+-- BNF: <command> ::= 
+  --    <add_command> 
+  --  | <remove_command>
+  --  | <set_command> 
+  --  | <rename_command> 
+  --  | <control_command> 
+  --  | <schedule_command> 
+  --  | <report_command> 
+  --  | <simulate_command> 
+  --  | "dump examples"
 parseCommand :: Parser Lib1.Command
 parseCommand = parseFull $
   dump <|>
@@ -148,14 +159,18 @@ parseFull p = Parser $ \input ->
            then Right (result, "")
            else Left ("Unconsumed input after command: '" ++ take 30 rest' ++ "'")
 
-dump :: Parser Lib1.Command 
+-- BNF: "dump examples"
+dump :: Parser Lib1.Command
 dump = (\_ _ _ -> Lib1.Dump Lib1.Examples)
   <$> parseKeyword "dump"
   <*> parseSpaces
   <*> parseKeyword "examples"
 
 
-
+-- BNF: <add_command> ::= 
+      --   "add house " <house_name> 
+      -- | "add room " <room_name> " to " <house_name> 
+      -- | "add device " <device_name> " to " <room_or_device_name>
 add :: Parser Lib1.Command
 add = Lib1.Add <$> (addHouse <|> addRoom <|> addDevice)
 addHouse :: Parser Lib1.AddCommand
@@ -198,7 +213,10 @@ addDevice = (\_ _ _ _ _ _ a _ _ _ _ _ b -> Lib1.AddDevice a b)
   <*> skipWhitespace
   <*> parseString
 
-
+-- BNF: <remove_command> ::= 
+      --   "remove house " <house_name> 
+      -- | "remove room " <room_name> 
+      -- | "remove device " <device_name>
 remove :: Parser Lib1.Command
 remove = Lib1.Remove <$> (removeHouse <|> removeRoom <|> removeDevice)
 removeHouse :: Parser Lib1.RemoveCommand
@@ -240,6 +258,11 @@ removeDevice = (\_ _ _ _ _ _ a _ _ _ _ _ b -> Lib1.RemoveDevice a b)
   <*> parseSpaces
   <*> skipWhitespace
   <*> parseString
+
+-- BNF: <rename_command> ::= 
+      --   "rename house " <old_name> " to " <new_name> 
+      -- | "rename room " <old_name> " to " <new_name> 
+      -- | "rename device " <old_name> " to " <new_name>
 
 rename :: Parser Lib1.Command
 rename = Lib1.Rename <$> (renameHouse <|> renameRoom <|> renameDevice)
@@ -287,8 +310,12 @@ renameDevice = (\_ _ _ _ _ _ a _ _ _ _ _ b -> Lib1.RenameDevice a b)
   <*> parseKeyword "to"
   <*> parseSpaces
   <*> skipWhitespace
-  <*> parseString  
+  <*> parseString
 
+--BNF: <set_command> ::= 
+      --   "set " <device_name> " brightness to " <value> 
+      -- | "set " <device_name> " temperature to " <value> 
+      -- | "set " <device_name> " state to " <state>
 set :: Parser Lib1.Command
 set = Lib1.Set <$> (setBrightness <|> setTemperature <|> setState)
 setBrightness :: Parser Lib1.SetCommand
@@ -328,6 +355,9 @@ setState = (\_ _ _ a _ _ _ _ _ b -> Lib1.SetState a b)
   <*> skipWhitespace
   <*> parseState
 
+--BNF: <control_command> ::= 
+      --   "turn on " <device_name> 
+      -- | "turn off " <device_name>
 control :: Parser Lib1.Command
 control = Lib1.Control <$> (turnOn <|> turnOff)
 turnOn :: Parser Lib1.ControlCommand
@@ -349,6 +379,8 @@ turnOff = (\_ _ _ _ _ _ a -> Lib1.TurnOff a)
   <*> skipWhitespace
   <*> parseString
 
+-- BNF: <schedule_command> ::= "schedule " <device_name> <action> " at " <value>
+
 schedule :: Parser Lib1.Command
 schedule = Lib1.Schedule <$> scheduleAt
 scheduleAt :: Parser Lib1.ScheduleCommand
@@ -364,6 +396,9 @@ scheduleAt = (\_  _ _ a  _ _ b _ _ c -> Lib1.ScheduleAt a b c)
   <*> skipWhitespace
   <*> parseDouble
 
+--BNF: <report_command> ::= <report_house>
+                  --  | <report_room>
+                  --  | <report_device>
 report :: Parser Lib1.Command
 report =  Lib1.Report <$> (reportHouse <|> reportRoom <|> reportDevice)
 reportHouse :: Parser Lib1.ReportCommand
@@ -403,6 +438,7 @@ reportDevice =
     <*> skipWhitespace
     <*> parseString
 
+--BNF: <simulate_command> ::= "simulate day"
 simulate :: Parser Lib1.Command
 simulate = (\_ _ _ _ -> Lib1.Simulate Lib1.SimulateDay)
     <$> parseKeyword "simulate"
@@ -414,7 +450,7 @@ simulateDay :: State -> State
 simulateDay st =
   let orderedSchedules = sortBy (\a b -> compare (time a) (time b)) (schedules st)
       newHouses = foldl (\hs sched -> houses (applySchedule sched (st { houses = hs }))) (houses st) orderedSchedules
-  in st { houses = newHouses, schedules = [] } 
+  in st { houses = newHouses, schedules = [] }
 applySchedule :: ScheduleItem -> State -> State
 applySchedule sched st =
   let dName = targetedDevice sched
@@ -429,9 +465,9 @@ applyActionToDevice :: Lib1.Action -> Device -> Device
 applyActionToDevice Lib1.TurnOnDevice d = d { deviceStatus = Lib1.On }
 applyActionToDevice Lib1.TurnOffDevice d = d { deviceStatus = Lib1.Off }
 applyActionToDevice Lib1.SetBrightnessLevel d =
-  d { deviceBrightness = Just 0} 
+  d { deviceBrightness = Just 0}
 applyActionToDevice Lib1.SetTemperatureLevel d =
-  d { deviceTemperature = Just 0 } 
+  d { deviceTemperature = Just 0 }
 printSchedule :: ScheduleItem -> IO ()
 printSchedule s = putStrLn $
   " - At " ++ show (time s) ++
@@ -483,7 +519,7 @@ emptyState = State [] []
 -- SINGLE atomically call in the function
 -- You do not want to write/read files here.
 execute :: TVar State -> Lib1.Command -> IO ()
-execute stateVar command = case command of 
+execute stateVar command = case command of
 
   Lib1.Add (Lib1.AddHouse hName) -> atomically $ do
     st <- readTVar stateVar
@@ -492,11 +528,11 @@ execute stateVar command = case command of
     writeTVar stateVar newState
   Lib1.Add (Lib1.AddRoom rName hName) -> atomically $ do
       st <- readTVar stateVar
-      let updateHouse h 
+      let updateHouse h
             |houseName h == hName = h {rooms = Room rName [] : rooms h}
             | otherwise = h
           newState = st {houses = map updateHouse (houses st)}
-      writeTVar stateVar newState 
+      writeTVar stateVar newState
   Lib1.Add (Lib1.AddDevice dName rName) -> atomically $ do
       st <- readTVar stateVar
       let updateRoom r
@@ -505,8 +541,8 @@ execute stateVar command = case command of
           updateHouse h = h {rooms = map updateRoom (rooms h)}
           newState = st {houses = map updateHouse (houses st)}
       writeTVar stateVar newState
-  
-  Lib1.Remove (Lib1.RemoveHouse hName) -> atomically $ do 
+
+  Lib1.Remove (Lib1.RemoveHouse hName) -> atomically $ do
       st <- readTVar stateVar
       let houseDel = filter ((/= hName) . houseName) (houses st)
           newState = st {houses = houseDel}
@@ -522,7 +558,7 @@ execute stateVar command = case command of
   Lib1.Remove (Lib1.RemoveDevice dName rName) -> atomically $ do
       st <-readTVar stateVar
       let updateRoom r
-            | roomName r == rName = r {devices = filter((/= dName) . deviceName) (devices r)}
+            | roomName r == rName = r {devices = filter ((/= dName) . deviceName) (devices r)}
             | otherwise = r
           updateHouse h = h {rooms = map updateRoom (rooms h)}
           newState = st {houses = map updateHouse (houses st)}
@@ -555,17 +591,17 @@ execute stateVar command = case command of
           updateHouse h = h {rooms = map updateRoom (rooms h)}
           newState = st {houses = map updateHouse (houses st)}
       writeTVar stateVar newState
-  
+
   Lib1.Rename (Lib1.RenameHouse oldName newName) -> atomically $ do
       st <- readTVar stateVar
       let updateHouse h
             | houseName h == oldName = h {houseName = newName}
             | otherwise = h
-          newState = st {houses = map updateHouse(houses st)}
+          newState = st {houses = map updateHouse (houses st)}
       writeTVar stateVar newState
   Lib1.Rename (Lib1.RenameRoom oldName newName) -> atomically $ do
       st <- readTVar stateVar
-      let updateRoom r 
+      let updateRoom r
             | roomName r == oldName = r {roomName = newName}
             | otherwise = r
           updateHouse h = h {rooms = map updateRoom (rooms h)}
@@ -650,7 +686,7 @@ execute stateVar command = case command of
         " [" ++ show (deviceStatus d) ++
         maybe "" (\b -> ", Brightness=" ++ show b) (deviceBrightness d) ++
         maybe "" (\t -> ", Temperature=" ++ show t) (deviceTemperature d) ++ "]"
-        
+
   Lib1.Simulate Lib1.SimulateDay -> do
       st <- readTVarIO stateVar
       if null (schedules st)
@@ -663,9 +699,9 @@ execute stateVar command = case command of
           let updatedState = simulateDay st
           atomically $ writeTVar stateVar updatedState
           putStrLn "Simulation complete. All scheduled actions have been applied."
-  
 
-  _ -> putStrLn "Command not implemented" 
+
+  _ -> putStrLn "Command not implemented"
 
 data StorageOp = Save String (Chan ()) | Load (Chan String)
 -- | This function is started from main
@@ -713,12 +749,10 @@ stateToCommands st =
   map scheduleToCmd (schedules st)
   where
     houseToCmds h =
-      ["add house " ++ houseName h] ++
-      concatMap (roomToCmds (houseName h)) (rooms h)
+      ("add house " ++ houseName h) : concatMap (roomToCmds (houseName h)) (rooms h)
 
     roomToCmds hName r =
-      ["add room " ++ roomName r ++ " to " ++ hName] ++
-      concatMap (deviceToCmds (roomName r)) (devices r)
+      ("add room " ++ roomName r ++ " to " ++ hName) : concatMap (deviceToCmds (roomName r)) (devices r)
 
     deviceToCmds rName d =
       ["add device " ++ deviceName d ++ " to " ++ rName]
@@ -728,7 +762,11 @@ stateToCommands st =
       ++ case deviceTemperature d of
            Just t  -> ["set " ++ deviceName d ++ " temperature " ++ show t]
            Nothing -> []
-      ++ ["set " ++ deviceName d ++ " state " ++ show (deviceStatus d)]
+      ++ ["set " ++ deviceName d ++ " state " ++ stateToString (deviceStatus d)]
+    
+    stateToString :: Lib1.State -> String
+    stateToString Lib1.On  = "on"
+    stateToString Lib1.Off = "off"
 
     scheduleToCmd s =
       "schedule " ++ targetedDevice s ++ " " ++ actionToString (action s)
@@ -741,7 +779,7 @@ stateToCommands st =
 
 
 -- | This function will be called on program start
--- File reads must be performed through `Chan StorageOp`
+-- File reads must be performed through `Chan StorageOp`   
 load :: Chan StorageOp -> TVar State -> IO (Either String ())
 load chan stateVar = do
   replyChan <- newChan

@@ -129,3 +129,122 @@
    <action> ::= "turn on" | "turn off" | "set brightness" | "set temperature"
 
 ```
+
+## State persistence
+When exiting, program serializes the internal `State` into equivalent CLI commands (one per line) and saves them to `state.txt`.  
+When restarted, it reads `state.txt`, parses each line back into a `Command`, and executes them, restoring the entire configuration.
+
+### Data Mapping
+
+| State Field | Description | CLI Command Generated |
+|--------------|--------------|------------------------|
+| `houses :: [House]` | Each house in the state | `add house <houseName>` |
+| `rooms :: [Room]` | Rooms inside each house | `add room <roomName> to <houseName>` |
+| `devices :: [Device]` | Devices inside rooms | `add device <deviceName> to <roomName>` |
+| `deviceStatus :: State` | On/Off state of device | `set <deviceName> state on/off` |
+| `deviceBrightness :: Maybe Double` | Optional brightness | `set <deviceName> brightness <value>` |
+| `deviceTemperature :: Maybe Double` | Optional temperature | `set <deviceName> temperature <value>` |
+| `schedules :: [ScheduleItem]` | Scheduled actions | `schedule <deviceName> <action> <time>` |
+
+Other runtime-only data (like temporary simulation results) is not persisted, as it can be recalculated.
+
+---
+
+### Example 1 — Single House
+
+#### Commands Executed
+```bash
+add house MyHome
+add room Kitchen to MyHome
+add device Lamp to Kitchen
+turn on Lamp
+set Lamp brightness 80
+```
+#### State
+```
+State
+  { houses =
+      [ House "MyHome"
+          [ Room "Kitchen"
+              [ Device "Lamp" On (Just 80.0) Nothing ]
+          ]
+      ]
+  , schedules = []
+  }
+```
+#### Saved state.txt
+```
+add house MyHome
+add room Kitchen to MyHome
+add device Lamp to Kitchen
+set Lamp brightness 80.0
+set Lamp state On
+```
+
+### Example 2 - Multiple Houses with Scheduling
+#### Commands Executed
+```bash
+add house Home1
+add room LivingRoom to Home1
+add device TV to LivingRoom
+set TV state on
+set TV brightness 40
+
+add house Home2
+add room Bedroom to Home2
+add device Heater to Bedroom
+set Heater temperature 22.5
+schedule Heater set temperature 23.0
+```
+
+#### State
+```
+State
+  { houses =
+      [ House "Home1"
+          [ Room "LivingRoom"
+              [ Device "TV" On (Just 40.0) Nothing ]
+          ]
+      , House "Home2"
+          [ Room "Bedroom"
+              [ Device "Heater" Off Nothing (Just 22.5) ]
+          ]
+      ]
+  , schedules =
+      [ ScheduleItem
+          { targetedDevice = "Heater"
+          , action = SetTemperatureLevel
+          , time = 23.0
+          }
+      ]
+  }
+```
+
+#### Saved state.txt
+```
+add house Home1
+add room LivingRoom to Home1
+add device TV to LivingRoom
+set TV brightness 40.0
+set TV state On
+
+add house Home2
+add room Bedroom to Home2
+add device Heater to Bedroom
+set Heater temperature 22.5
+set Heater state Off
+
+schedule Heater set temperature 23.0
+```
+
+## State persistance demonstration
+1. Program was launched
+![Step 1: Program Launch](programLaunch.png)
+2. Some commands were executed
+![Step 2: After Commands](afterCommands.png)
+3. Program was exited
+![Step 3: Program Exit](programExit.png)
+4. Program launched again
+![Step 4: Program Launched Again](programLaunchAgain.png)
+5. State was viewed and we see it matches state from step 2
+![Step 5: State Viewed](stateViewed.png)
