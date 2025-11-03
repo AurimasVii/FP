@@ -698,9 +698,63 @@ storageOpLoop chan = forever $ do
 -- and on programs' exit. File writes must be performed
 -- through `Chan StorageOp`.
 save :: Chan StorageOp -> TVar State -> IO (Either String ())
-save _ _ = return $ Left "Implement me 3"
+save chan stateVar = do
+  st <- readTVarIO stateVar
+  doneChan <- newChan
+  let commands = stateToCommands st
+      content = unlines commands
+  writeChan chan (Save content doneChan)
+  _ <- readChan doneChan
+  return $ Right ()
+
+stateToCommands :: State -> [String]
+stateToCommands st =
+  concatMap houseToCmds (houses st) ++
+  map scheduleToCmd (schedules st)
+  where
+    houseToCmds h =
+      ["add house " ++ houseName h] ++
+      concatMap (roomToCmds (houseName h)) (rooms h)
+
+    roomToCmds hName r =
+      ["add room " ++ roomName r ++ " to " ++ hName] ++
+      concatMap (deviceToCmds (roomName r)) (devices r)
+
+    deviceToCmds rName d =
+      ["add device " ++ deviceName d ++ " to " ++ rName]
+      ++ case deviceBrightness d of
+           Just b  -> ["set " ++ deviceName d ++ " brightness " ++ show b]
+           Nothing -> []
+      ++ case deviceTemperature d of
+           Just t  -> ["set " ++ deviceName d ++ " temperature " ++ show t]
+           Nothing -> []
+      ++ ["set " ++ deviceName d ++ " state " ++ show (deviceStatus d)]
+
+    scheduleToCmd s =
+      "schedule " ++ targetedDevice s ++ " " ++ actionToString (action s)
+        ++ " " ++ show (time s)
+
+    actionToString Lib1.TurnOnDevice        = "turn on"
+    actionToString Lib1.TurnOffDevice       = "turn off"
+    actionToString Lib1.SetBrightnessLevel  = "set brightness"
+    actionToString Lib1.SetTemperatureLevel = "set temperature"
+
 
 -- | This function will be called on program start
 -- File reads must be performed through `Chan StorageOp`
 load :: Chan StorageOp -> TVar State -> IO (Either String ())
-load _ _ = return $ Left "Implement me 4"
+load chan stateVar = do
+  replyChan <- newChan
+  writeChan chan (Load replyChan)
+  content <- readChan replyChan
+
+  if "ERROR:" `isPrefixOf` content
+    then return (Left content)
+    else do
+      let linesOfFile = filter (not . null) (lines content)
+      forM_ linesOfFile $ \line ->
+        case runParser parseCommand line of
+          Left err -> putStrLn $ "Failed to parse: " ++ line ++ " (" ++ err ++ ")"
+          Right (cmd, _) -> execute stateVar cmd
+      return (Right ())
+
