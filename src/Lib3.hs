@@ -703,7 +703,7 @@ execute stateVar command = case command of
 
   _ -> putStrLn "Command not implemented"
 
-data StorageOp = Save String (Chan ()) | Load (Chan String)
+data StorageOp = Save String (Chan ()) | Load (Chan (Either String String))
 -- | This function is started from main
 -- in a dedicated thread. It must be used to control
 -- file access in a synchronized manner: read requests
@@ -718,17 +718,17 @@ storageOpLoop chan = forever $ do
       e <- try (writeFile stateFile content) :: IO (Either IOException ())
       case e of
         Left err -> putStrLn $ "Save error: " ++ show err
-        Right _ -> return ()
+        Right _ -> pure ()
       writeChan doneChan ()
 
     Load replyChan -> do
       e <- try (readFile stateFile) :: IO (Either IOException String)
       case e of
-        Right txt -> writeChan replyChan txt
+        Right txt -> writeChan replyChan (Right txt)
         Left err ->
           if isDoesNotExistError err
-            then writeChan replyChan ""
-            else writeChan replyChan $ "ERROR: " ++ show err
+            then writeChan replyChan (Right "")
+            else writeChan replyChan (Left $ "File read error: " ++ show err)
 
 -- | This function will be called periodically
 -- and on programs' exit. File writes must be performed
@@ -741,7 +741,7 @@ save chan stateVar = do
       content = unlines commands
   writeChan chan (Save content doneChan)
   _ <- readChan doneChan
-  return $ Right ()
+  pure $ Right ()
 
 stateToCommands :: State -> [String]
 stateToCommands st =
@@ -784,15 +784,15 @@ load :: Chan StorageOp -> TVar State -> IO (Either String ())
 load chan stateVar = do
   replyChan <- newChan
   writeChan chan (Load replyChan)
-  content <- readChan replyChan
+  res <- readChan replyChan
 
-  if "ERROR:" `isPrefixOf` content
-    then return (Left content)
-    else do
+  case res of 
+    Left err -> pure (Left err)
+    Right content -> do
       let linesOfFile = filter (not . null) (lines content)
       forM_ linesOfFile $ \line ->
         case runParser parseCommand line of
-          Left err -> putStrLn $ "Failed to parse: " ++ line ++ " (" ++ err ++ ")"
+          Left err -> putStrLn $ "Failed to parse: " ++ line ++ "(" ++ err ++ ")"
           Right (cmd, _) -> execute stateVar cmd
-      return (Right ())
+      pure (Right ())
 

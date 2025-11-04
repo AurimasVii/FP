@@ -1,5 +1,5 @@
 add house a
+add room c to a
 add room b to a
 add device d to b
 set d state off
-add room c to a
