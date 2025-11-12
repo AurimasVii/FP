@@ -1,5 +1,4 @@
 add house a
-add room c to a
 add room b to a
-add device d to b
-set d state off
+add device c to b
+set c state on

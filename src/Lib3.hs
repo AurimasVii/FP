@@ -7,7 +7,6 @@ module Lib3(
 import qualified Lib1
 
 import Control.Concurrent.STM
-import Control.Concurrent (Chan, readChan)
 import Control.Applicative
 import Data.Char (isAlpha, isDigit)
 import Data.List (isPrefixOf, sortBy)
@@ -75,11 +74,6 @@ parseSpaces = Parser $ \input ->
   let (s, rest) = span (== ' ') input
   in Right (s, rest)
 
-skipWhitespace :: Parser String
-skipWhitespace = Parser $ \input ->
-  let (spaces, rest) = span (`elem` [' ', '\t', '\n', '\r']) input
-  in Right (spaces, rest)
-
 parseString :: Parser String
 parseString = some (Parser $ \case
   (x:xs) | isAlpha x -> Right (x, xs)
@@ -125,7 +119,7 @@ parseAction =
     <*> parseKeyword "temperature")
 
 parseReportList :: Parser [Lib1.ReportCommand]
-parseReportList = many (skipWhitespace *> (reportHouse <|> reportRoom <|> reportDevice))
+parseReportList = many (reportHouse <|> reportRoom <|> reportDevice)
 
 -- BNF: <command> ::= 
   --    <add_command> 
@@ -138,7 +132,7 @@ parseReportList = many (skipWhitespace *> (reportHouse <|> reportRoom <|> report
   --  | <simulate_command> 
   --  | "dump examples"
 parseCommand :: Parser Lib1.Command
-parseCommand = parseFull $
+parseCommand =
   dump <|>
   add <|>
   remove <|>
@@ -148,16 +142,6 @@ parseCommand = parseFull $
   schedule <|>
   report <|>
   simulate
-
-parseFull :: Parser a -> Parser a
-parseFull p = Parser $ \input ->
-  case runParser p input of
-    Left e -> Left e
-    Right (result, rest) ->
-      let rest' = dropWhile (== ' ') rest
-      in if null rest'
-           then Right (result, "")
-           else Left ("Unconsumed input after command: '" ++ take 30 rest' ++ "'")
 
 -- BNF: "dump examples"
 dump :: Parser Lib1.Command
@@ -174,43 +158,33 @@ dump = (\_ _ _ -> Lib1.Dump Lib1.Examples)
 add :: Parser Lib1.Command
 add = Lib1.Add <$> (addHouse <|> addRoom <|> addDevice)
 addHouse :: Parser Lib1.AddCommand
-addHouse = (\_ _ _ _ _ _ a -> Lib1.AddHouse a)
+addHouse = (\_ _ _ _ a -> Lib1.AddHouse a)
   <$> parseKeyword "add"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "house"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
 addRoom :: Parser Lib1.AddCommand
-addRoom = (\_ _ _ _ _ _ a _ _ _ _ _ b -> Lib1.AddRoom a b)
+addRoom = (\_ _ _ _ a _ _ _ b -> Lib1.AddRoom a b)
   <$> parseKeyword "add"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "room"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "to"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
 addDevice :: Parser Lib1.AddCommand
-addDevice = (\_ _ _ _ _ _ a _ _ _ _ _ b -> Lib1.AddDevice a b)
+addDevice = (\_ _ _ _ a _ _ _ b -> Lib1.AddDevice a b)
   <$> parseKeyword "add"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "device"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "to"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
 
 -- BNF: <remove_command> ::= 
@@ -220,43 +194,33 @@ addDevice = (\_ _ _ _ _ _ a _ _ _ _ _ b -> Lib1.AddDevice a b)
 remove :: Parser Lib1.Command
 remove = Lib1.Remove <$> (removeHouse <|> removeRoom <|> removeDevice)
 removeHouse :: Parser Lib1.RemoveCommand
-removeHouse = (\_ _ _ _ _ _ a-> Lib1.RemoveHouse a)
+removeHouse = (\_ _ _ _ a-> Lib1.RemoveHouse a)
   <$> parseKeyword "remove"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "house"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
 removeRoom :: Parser Lib1.RemoveCommand
-removeRoom = (\_ _ _ _ _ _ a _ _ _ _ _ b -> Lib1.RemoveRoom a b)
+removeRoom = (\_ _ _ _ a _ _ _ b -> Lib1.RemoveRoom a b)
   <$> parseKeyword "remove"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "room"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "from"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
 removeDevice :: Parser Lib1.RemoveCommand
-removeDevice = (\_ _ _ _ _ _ a _ _ _ _ _ b -> Lib1.RemoveDevice a b)
+removeDevice = (\_ _ _ _ a _ _ _ b -> Lib1.RemoveDevice a b)
   <$> parseKeyword "remove"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "device"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "from"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
 
 -- BNF: <rename_command> ::= 
@@ -267,49 +231,37 @@ removeDevice = (\_ _ _ _ _ _ a _ _ _ _ _ b -> Lib1.RemoveDevice a b)
 rename :: Parser Lib1.Command
 rename = Lib1.Rename <$> (renameHouse <|> renameRoom <|> renameDevice)
 renameHouse :: Parser Lib1.RenameCommand
-renameHouse = (\_ _ _ _ _ _ a _ _ _ _ _ b -> Lib1.RenameHouse a b)
+renameHouse = (\_ _ _ _ a _ _ _ b -> Lib1.RenameHouse a b)
   <$> parseKeyword "rename"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "house"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "to"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
 renameRoom :: Parser Lib1.RenameCommand
-renameRoom = (\_ _ _ _ _ _ a _ _ _ _ _ b -> Lib1.RenameRoom a b)
+renameRoom = (\_ _ _ _ a _ _ _ b -> Lib1.RenameRoom a b)
   <$> parseKeyword "rename"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "room"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "to"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
 renameDevice :: Parser Lib1.RenameCommand
-renameDevice = (\_ _ _ _ _ _ a _ _ _ _ _ b -> Lib1.RenameDevice a b)
+renameDevice = (\_ _ _ _ a _ _ _ b -> Lib1.RenameDevice a b)
   <$> parseKeyword "rename"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "device"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "to"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
 
 --BNF: <set_command> ::= 
@@ -319,40 +271,31 @@ renameDevice = (\_ _ _ _ _ _ a _ _ _ _ _ b -> Lib1.RenameDevice a b)
 set :: Parser Lib1.Command
 set = Lib1.Set <$> (setBrightness <|> setTemperature <|> setState)
 setBrightness :: Parser Lib1.SetCommand
-setBrightness = (\_ _ _ a _ _ _ _ _ b -> Lib1.SetBrightness a b)
+setBrightness = (\_ _ a _ _ _ b -> Lib1.SetBrightness a b)
   <$> parseKeyword "set"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "brightness"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseDouble
 setTemperature :: Parser Lib1.SetCommand
-setTemperature = (\_ _ _ a _ _ _ _ _ b -> Lib1.SetTemperature a b)
+setTemperature = (\_ _ a _ _ _ b -> Lib1.SetTemperature a b)
   <$> parseKeyword "set"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "temperature"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseDouble
 setState :: Parser Lib1.SetCommand
-setState = (\_ _ _ a _ _ _ _ _ b -> Lib1.SetState a b)
+setState = (\_ _ a _ _ _ b -> Lib1.SetState a b)
   <$> parseKeyword "set"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "state"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseState
 
 --BNF: <control_command> ::= 
@@ -361,22 +304,18 @@ setState = (\_ _ _ a _ _ _ _ _ b -> Lib1.SetState a b)
 control :: Parser Lib1.Command
 control = Lib1.Control <$> (turnOn <|> turnOff)
 turnOn :: Parser Lib1.ControlCommand
-turnOn = (\_ _ _ _ _ _ a -> Lib1.TurnOn a)
+turnOn = (\_ _ _ _ a -> Lib1.TurnOn a)
   <$> parseKeyword "turn"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "on"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
 turnOff :: Parser Lib1.ControlCommand
-turnOff = (\_ _ _ _ _ _ a -> Lib1.TurnOff a)
+turnOff = (\_ _ _ _ a -> Lib1.TurnOff a)
   <$> parseKeyword "turn"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseKeyword "off"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
 
 -- BNF: <schedule_command> ::= "schedule " <device_name> <action> " at " <value>
@@ -384,16 +323,13 @@ turnOff = (\_ _ _ _ _ _ a -> Lib1.TurnOff a)
 schedule :: Parser Lib1.Command
 schedule = Lib1.Schedule <$> scheduleAt
 scheduleAt :: Parser Lib1.ScheduleCommand
-scheduleAt = (\_  _ _ a  _ _ b _ _ c -> Lib1.ScheduleAt a b c)
+scheduleAt = (\_ _ a _ b _ c -> Lib1.ScheduleAt a b c)
   <$> parseKeyword "schedule"
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseString
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseAction
   <*> parseSpaces
-  <*> skipWhitespace
   <*> parseDouble
 
 --BNF: <report_command> ::= <report_house>
@@ -403,47 +339,38 @@ report :: Parser Lib1.Command
 report =  Lib1.Report <$> (reportHouse <|> reportRoom <|> reportDevice)
 reportHouse :: Parser Lib1.ReportCommand
 reportHouse =
-  (\_ _ _ _ _ _ name _ _ reports -> Lib1.ReportHouse name reports)
+  (\_ _ _ _ name _ reports -> Lib1.ReportHouse name reports)
     <$> parseKeyword "report"
     <*> parseSpaces
-    <*> skipWhitespace
     <*> parseKeyword "house"
     <*> parseSpaces
-    <*> skipWhitespace
     <*> parseString
     <*> parseSpaces
-    <*> skipWhitespace
     <*> parseReportList
 reportRoom :: Parser Lib1.ReportCommand
 reportRoom =
-  (\_ _ _ _ _ _ name _ _ reports -> Lib1.ReportRoom name reports)
+  (\_ _ _ _ name _ reports -> Lib1.ReportRoom name reports)
     <$> parseKeyword "report"
     <*> parseSpaces
-    <*> skipWhitespace
     <*> parseKeyword "room"
     <*> parseSpaces
-    <*> skipWhitespace
     <*> parseString
     <*> parseSpaces
-    <*> skipWhitespace
     <*> parseReportList
 reportDevice :: Parser Lib1.ReportCommand
 reportDevice =
-  (\_ _ _ _ _ _ name -> Lib1.ReportDevice name)
+  (\_ _ _ _ name -> Lib1.ReportDevice name)
     <$> parseKeyword "report"
     <*> parseSpaces
-    <*> skipWhitespace
     <*> parseKeyword "device"
     <*> parseSpaces
-    <*> skipWhitespace
     <*> parseString
 
 --BNF: <simulate_command> ::= "simulate day"
 simulate :: Parser Lib1.Command
-simulate = (\_ _ _ _ -> Lib1.Simulate Lib1.SimulateDay)
+simulate = (\_ _ _ -> Lib1.Simulate Lib1.SimulateDay)
     <$> parseKeyword "simulate"
     <*> parseSpaces
-    <*> skipWhitespace
     <*> parseKeyword "day"
 
 simulateDay :: State -> State
