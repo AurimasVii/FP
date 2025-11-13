@@ -630,7 +630,7 @@ execute stateVar command = case command of
 
   _ -> putStrLn "Command not implemented"
 
-data StorageOp = Save String (Chan ()) | Load (Chan (Either String String))
+data StorageOp = Save String (Chan (Either String ())) | Load (Chan (Either String String))
 -- | This function is started from main
 -- in a dedicated thread. It must be used to control
 -- file access in a synchronized manner: read requests
@@ -644,9 +644,8 @@ storageOpLoop chan = forever $ do
     Save content doneChan -> do
       e <- try (writeFile stateFile content) :: IO (Either IOException ())
       case e of
-        Left err -> putStrLn $ "Save error: " ++ show err
-        Right _ -> pure ()
-      writeChan doneChan ()
+        Left err -> writeChan doneChan (Left $ "Save error: " ++ show err)
+        Right _ -> writeChan doneChan (Right ())
 
     Load replyChan -> do
       e <- try (readFile stateFile) :: IO (Either IOException String)
@@ -667,8 +666,7 @@ save chan stateVar = do
   let commands = stateToCommands st
       content = unlines commands
   writeChan chan (Save content doneChan)
-  _ <- readChan doneChan
-  pure $ Right ()
+  readChan doneChan
 
 stateToCommands :: State -> [String]
 stateToCommands st =
