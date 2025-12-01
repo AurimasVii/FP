@@ -15,6 +15,9 @@ import Control.Monad
 import Control.Concurrent.Chan
 import System.IO.Error
 
+import System.IO.Strict(readFile)
+import System.IO(writeFile)
+
 newtype Parser a = Parser {
     runParser :: String -> Either String (a, String)
 }
@@ -637,6 +640,8 @@ data StorageOp = Save String (Chan (Either String ())) | Load (Chan (Either Stri
 -- from chan, do the IO operations needed and respond
 -- to a channel provided in a request. It must run forever.
 -- Modify as needed.
+-- You might want to use readFile from `strict` library
+-- if you get "resource locked" exceptions under Windows.
 storageOpLoop :: Chan StorageOp -> IO ()
 storageOpLoop chan = forever $ do
   op <- readChan chan

@@ -32,17 +32,27 @@ library
       Lessons.Lesson06
       Lessons.Lesson07
       Lessons.Lesson08
+      Lessons.Lesson09
+      Lessons.Lesson10
+      Lessons.Lesson11
+      Lessons.Lesson12
       Lib1
       Lib2
       Lib3
+      Lib4
   hs-source-dirs:
       src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
-      async
+      QuickCheck
+    , async
     , base >=4.7 && <5
+    , deepseq
+    , free
     , random
     , stm
+    , strict
+    , transformers
   default-language: Haskell2010
 
 executable fp2025-one
@@ -107,4 +117,6 @@ test-suite fp2024-test
     , fp2025
     , tasty
     , tasty-hunit
+    , tasty-quickcheck
+    , transformers
   default-language: Haskell2010
