@@ -2,7 +2,8 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE LambdaCase #-}
 module Lib3(
-    emptyState, State(..), execute, load, save, storageOpLoop, StorageOp, Parser(..), parseCommand) where
+    emptyState, State(..), House(..), Room(..), Device(..), ScheduleItem(..), 
+    execute, load, save, storageOpLoop, StorageOp, Parser(..), parseCommand, simulateDay) where
 
 import qualified Lib1
 
@@ -16,7 +17,7 @@ import Control.Concurrent.Chan
 import System.IO.Error
 
 import System.IO.Strict(readFile)
-import System.IO(writeFile)
+import qualified System.IO as IO
 
 newtype Parser a = Parser {
     runParser :: String -> Either String (a, String)
@@ -647,13 +648,13 @@ storageOpLoop chan = forever $ do
   op <- readChan chan
   case op of
     Save content doneChan -> do
-      e <- try (writeFile stateFile content) :: IO (Either IOException ())
+      e <- try (IO.writeFile stateFile content) :: IO (Either IOException ())
       case e of
         Left err -> writeChan doneChan (Left $ "Save error: " ++ show err)
         Right _ -> writeChan doneChan (Right ())
 
     Load replyChan -> do
-      e <- try (readFile stateFile) :: IO (Either IOException String)
+      e <- try (System.IO.Strict.readFile stateFile) :: IO (Either IOException String)
       case e of
         Right txt -> writeChan replyChan (Right txt)
         Left err ->
@@ -687,12 +688,12 @@ stateToCommands st =
     deviceToCmds rName d =
       ["add device " ++ deviceName d ++ " to " ++ rName]
       ++ case deviceBrightness d of
-           Just b  -> ["set " ++ deviceName d ++ " brightness " ++ show b]
+           Just b  -> ["set device " ++ deviceName d ++ " brightness to " ++ show b]
            Nothing -> []
       ++ case deviceTemperature d of
-           Just t  -> ["set " ++ deviceName d ++ " temperature " ++ show t]
+           Just t  -> ["set device " ++ deviceName d ++ " temperature to " ++ show t]
            Nothing -> []
-      ++ ["set " ++ deviceName d ++ " state " ++ stateToString (deviceStatus d)]
+      ++ ["set device " ++ deviceName d ++ " state to " ++ stateToString (deviceStatus d)]
     
     stateToString :: Lib1.State -> String
     stateToString Lib1.On  = "on"
@@ -700,7 +701,7 @@ stateToCommands st =
 
     scheduleToCmd s =
       "schedule " ++ targetedDevice s ++ " " ++ actionToString (action s)
-        ++ " " ++ show (time s)
+        ++ " at " ++ show (time s)
 
     actionToString Lib1.TurnOnDevice        = "turn on"
     actionToString Lib1.TurnOffDevice       = "turn off"

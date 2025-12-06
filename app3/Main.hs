@@ -2,7 +2,6 @@
 module Main (main) where
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
-import Lib2 qualified
 import Lib3 qualified
 import System.Console.Repline
   ( CompleterStyle (Word),
@@ -13,13 +12,9 @@ import System.Console.Repline
   )
 import System.Exit
 
-import Control.Monad.STM
-import Control.Concurrent.STM.TVar(TVar)
-import Control.Concurrent.Async
-import Control.Concurrent.STM (newTVarIO, TVar, atomically, readTVarIO)
-import Control.Concurrent (Chan, newChan, writeChan, readChan, threadDelay, forkIO)
+import Control.Concurrent.STM (TVar, newTVarIO)
+import Control.Concurrent (Chan, newChan, threadDelay, forkIO)
 import Control.Monad (forever)
-import qualified Lib3
 
 type Repl a = HaskelineT IO a
 

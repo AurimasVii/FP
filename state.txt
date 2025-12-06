@@ -1,4 +1,0 @@
-add house a
-add room b to a
-add device c to b
-set c state on
