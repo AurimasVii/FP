@@ -199,6 +199,10 @@ addDevice = (\_ _ _ _ a _ _ _ b -> Lib1.AddDevice a b)
   <*> parseSpaces
   <*> parseString
 
+-- BNF: <remove_command> ::= 
+      --   "remove house " <house_name> 
+      -- | "remove room " <room_name> " from " <house_name>
+      -- | "remove device " <device_name> " from " <room_name>
 parseRemove :: Parser Lib1.Command
 parseRemove = Lib1.Remove <$> ExceptT (do
   stateBefore <- get
@@ -353,6 +357,9 @@ setState = (\_ _ _ _ a _ _ _ _ _ b -> Lib1.SetState a b)
   <*> parseSpaces
   <*> parseState
 
+-- BNF: <control_command> ::= 
+      --   "turn on " <device_name> 
+      -- | "turn off " <device_name>
 parseControl :: Parser Lib1.Command
 parseControl = Lib1.Control <$> ExceptT (do
   stateBefore <- get
@@ -390,7 +397,7 @@ scheduleAt = (\_ _ a _ b _ c -> Lib1.ScheduleAt a b c)
   <*> parseSpaces
   <*> parseDouble
 
---BNF: <report_command> ::= <report_house>
+-- BNF: <report_command> ::= <report_house>
                   --  | <report_room>
                   --  | <report_device>
 parseReport :: Parser Lib1.Command
@@ -452,7 +459,7 @@ parseReportList = many (ExceptT $ do
           put stateBefore
           runExceptT reportDevice)
 
---BNF: <simulate_command> ::= "simulate day"
+-- BNF: <simulate_command> ::= "simulate day"
 parseSimulate :: Parser Lib1.Command
 parseSimulate = (\_ _ _ -> Lib1.Simulate Lib1.SimulateDay)
     <$> parseKeyword "simulate"

@@ -1,0 +1,4 @@
+add house TestHouse
+add room TestRoom to TestHouse
+add device TestDevice to TestRoom
+set device TestDevice state to off

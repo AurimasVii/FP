@@ -20,7 +20,10 @@ httpInterpreter :: Lib4.CommandDSL a -> IO a
 httpInterpreter = foldFree httpAlgebra
   where
     httpAlgebra :: Lib4.CommandAlgebra x -> IO x
-    httpAlgebra (Lib4.DumpCmd _ next) = return (next ())
+    httpAlgebra (Lib4.DumpCmd d next) = do
+      result <- sendCommandToServer (Lib1.Dump d)
+      putStrLn result
+      return (next ())
     httpAlgebra (Lib4.AddCmd cmd next) = do
       _ <- sendCommandToServer (Lib1.Add cmd)
       return (next ())
