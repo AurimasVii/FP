@@ -257,12 +257,12 @@ stateInterpreter = foldFree stateAlgebra
 
 exampleProgram :: Lib4.CommandDSL String
 exampleProgram = do
-  Lib4.dump Lib1.Examples
-  Lib4.add (Lib1.AddHouse "TestHouse")
-  Lib4.add (Lib1.AddRoom "TestRoom" "TestHouse")
-  Lib4.add (Lib1.AddDevice "TestDevice" "TestRoom")
-  Lib4.report (Lib1.ReportHouse "TestHouse" [])
-
+  Lib4.dslDump Lib1.Examples
+  Lib4.dslAdd (Lib1.AddHouse "TestHouse")
+  Lib4.dslAdd (Lib1.AddRoom "TestRoom" "TestHouse")
+  Lib4.dslAdd (Lib1.AddDevice "TestDevice" "TestRoom")
+  Lib4.dslReport (Lib1.ReportHouse "TestHouse" [])
+  
 main :: IO ()
 main = do
   putStrLn "=== Running with HTTP interpreter ==="

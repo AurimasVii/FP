@@ -6,7 +6,7 @@ module Lib4 (
     parseCommand,
     CommandDSL,
     CommandAlgebra(..),
-    dump, add, remove, set, rename, control, schedule, report, simulate
+    dslDump, dslAdd, dslRemove, dslSet, dslRename, dslControl, dslSchedule, dslReport, dslSimulate
 ) where
 
 import qualified Lib1
@@ -24,6 +24,17 @@ import Control.Monad (MonadPlus, mzero, mplus)
 type ErrorMsg = String
 type Input = String
 type Parser = ExceptT ErrorMsg (State Input)
+
+instance {-# OVERLAPPING #-} Alternative Parser where
+  empty = throwE "empty"
+  p <|> q = ExceptT $ do
+    stateBefore <- get
+    result <- runExceptT p
+    case result of
+      Left _ -> do
+        put stateBefore
+        runExceptT q
+      Right val -> return (Right val)
 
 parseKeyword :: String -> Parser String
 parseKeyword kw = do
@@ -43,14 +54,8 @@ parseSpaces = do
   return s
 
 parseString :: Parser String
-parseString = ExceptT $ do
-  stateBefore <- get
-  result <- runExceptT (some parseLetter)
-  case result of
-    Right x -> return (Right x)
-    Left err -> do
-      put stateBefore
-      return (Left err)
+parseString = some parseLetter
+
 parseLetter :: Parser Char
 parseLetter = do
     input <- lift get
@@ -63,11 +68,12 @@ parseLetter = do
             else throwE $ "A letter is expected, but got " ++ [h]
 
 parseDouble :: Parser Double
-parseDouble = (\intPart _ fracPart -> read (intPart ++ "." ++ fracPart))
+parseDouble = ((\intPart _ fracPart -> read (intPart ++ "." ++ fracPart))
     <$> some parseDigit
     <*> parseKeyword "."
-    <*> some parseDigit
-  <|> read <$> some parseDigit
+    <*> some parseDigit)
+  <|> (read <$> some parseDigit)
+
 parseDigit :: Parser Char
 parseDigit = do
   input <- lift get
@@ -79,96 +85,50 @@ parseDigit = do
         return h
       else throwE $ "A digit is expected, but got " ++ [h]
 
--- BNF: <state> ::= "on" || "off"
 parseState :: Parser Lib1.State
-parseState = Lib1.On <$ parseKeyword "on"
-          <|> Lib1.Off <$ parseKeyword "off"
+parseState = (Lib1.On <$ parseKeyword "on")
+          <|> (Lib1.Off <$ parseKeyword "off")
 
--- BNF: <action> ::= "turn on" | "turn off" | "set brightness" | "set temperature"
 parseAction :: Parser Lib1.Action
-parseAction = ExceptT $ do
-  stateBefore <- get
-  let p1 = (\_ _ _ -> Lib1.TurnOnDevice)
-        <$> parseKeyword "turn"
-        <*> parseSpaces
-        <*> parseKeyword "on"
-      p2 = (\_ _ _ -> Lib1.TurnOffDevice)
-        <$> parseKeyword "turn"
-        <*> parseSpaces
-        <*> parseKeyword "off"
-      p3 = (\_ _ _ -> Lib1.SetBrightnessLevel)
-        <$> parseKeyword "set"
-        <*> parseSpaces
-        <*> parseKeyword "brightness"
-      p4 = (\_ _ _ -> Lib1.SetTemperatureLevel)
-        <$> parseKeyword "set"
-        <*> parseSpaces
-        <*> parseKeyword "temperature"
-  result1 <- runExceptT p1
-  case result1 of
-    Right x -> return (Right x)
-    Left _ -> do
-      put stateBefore
-      result2 <- runExceptT p2
-      case result2 of
-        Right x -> return (Right x)
-        Left _ -> do
-          put stateBefore
-          result3 <- runExceptT p3
-          case result3 of
-            Right x -> return (Right x)
-            Left _ -> do
-              put stateBefore
-              runExceptT p4
-
--- BNF: <command> ::= 
-  --    <add_command> 
-  --  | <remove_command>
-  --  | <set_command> 
-  --  | <rename_command> 
-  --  | <control_command> 
-  --  | <schedule_command> 
-  --  | <report_command> 
-  --  | <simulate_command> 
-  --  | "dump examples"
+parseAction =
+  ((\_ _ _ -> Lib1.TurnOnDevice)
+    <$> parseKeyword "turn"
+    <*> parseSpaces
+    <*> parseKeyword "on") <|>
+  ((\_ _ _ -> Lib1.TurnOffDevice)
+    <$> parseKeyword "turn"
+    <*> parseSpaces
+    <*> parseKeyword "off") <|>
+  ((\_ _ _ -> Lib1.SetBrightnessLevel)
+    <$> parseKeyword "set"
+    <*> parseSpaces
+    <*> parseKeyword "brightness") <|>
+  ((\_ _ _ -> Lib1.SetTemperatureLevel)
+    <$> parseKeyword "set"
+    <*> parseSpaces
+    <*> parseKeyword "temperature")
 
 parseCommand :: Parser Lib1.Command
 parseCommand =
-   parseDump <|>
-   parseAdd <|>
-   parseRemove <|>
-   parseRename <|>
-   parseSet <|>
-   parseControl <|>
-   parseSchedule <|>
-   parseReport <|>
-   parseSimulate
+   dump <|>
+   add <|>
+   remove <|>
+   rename <|>
+   set <|>
+   control <|>
+   schedule <|>
+   report <|>
+   simulate
 
--- BNF: "dump examples"
-parseDump :: Parser Lib1.Command
-parseDump = (\_ _ _ -> Lib1.Dump Lib1.Examples)
+dump :: Parser Lib1.Command
+dump = (\_ _ _ -> Lib1.Dump Lib1.Examples)
   <$> parseKeyword "dump"
   <*> parseSpaces
   <*> parseKeyword "examples"
 
--- BNF: <add_command> ::= 
-      --   "add house " <house_name> 
-      -- | "add room " <room_name> " to " <house_name> 
-      -- | "add device " <device_name> " to " <room_or_device_name>
-parseAdd :: Parser Lib1.Command
-parseAdd = Lib1.Add <$> ExceptT (do
-  stateBefore <- get
-  result1 <- runExceptT addHouse
-  case result1 of
-    Right x -> return (Right x)
-    Left _ -> do
-      put stateBefore
-      result2 <- runExceptT addRoom
-      case result2 of
-        Right x -> return (Right x)
-        Left _ -> do
-          put stateBefore
-          runExceptT addDevice)
+add :: Parser Lib1.Command
+add = Lib1.Add <$> (addHouse <|> addRoom <|> addDevice)
+
 addHouse :: Parser Lib1.AddCommand
 addHouse = (\_ _ _ _ a -> Lib1.AddHouse a)
   <$> parseKeyword "add"
@@ -176,6 +136,7 @@ addHouse = (\_ _ _ _ a -> Lib1.AddHouse a)
   <*> parseKeyword "house"
   <*> parseSpaces
   <*> parseString
+
 addRoom :: Parser Lib1.AddCommand
 addRoom = (\_ _ _ _ a _ _ _ b -> Lib1.AddRoom a b)
   <$> parseKeyword "add"
@@ -187,6 +148,7 @@ addRoom = (\_ _ _ _ a _ _ _ b -> Lib1.AddRoom a b)
   <*> parseKeyword "to"
   <*> parseSpaces
   <*> parseString
+
 addDevice :: Parser Lib1.AddCommand
 addDevice = (\_ _ _ _ a _ _ _ b -> Lib1.AddDevice a b)
   <$> parseKeyword "add"
@@ -199,24 +161,9 @@ addDevice = (\_ _ _ _ a _ _ _ b -> Lib1.AddDevice a b)
   <*> parseSpaces
   <*> parseString
 
--- BNF: <remove_command> ::= 
-      --   "remove house " <house_name> 
-      -- | "remove room " <room_name> " from " <house_name>
-      -- | "remove device " <device_name> " from " <room_name>
-parseRemove :: Parser Lib1.Command
-parseRemove = Lib1.Remove <$> ExceptT (do
-  stateBefore <- get
-  result1 <- runExceptT removeHouse
-  case result1 of
-    Right x -> return (Right x)
-    Left _ -> do
-      put stateBefore
-      result2 <- runExceptT removeRoom
-      case result2 of
-        Right x -> return (Right x)
-        Left _ -> do
-          put stateBefore
-          runExceptT removeDevice)
+remove :: Parser Lib1.Command
+remove = Lib1.Remove <$> (removeHouse <|> removeRoom <|> removeDevice)
+
 removeHouse :: Parser Lib1.RemoveCommand
 removeHouse = (\_ _ _ _ a-> Lib1.RemoveHouse a)
   <$> parseKeyword "remove"
@@ -224,6 +171,7 @@ removeHouse = (\_ _ _ _ a-> Lib1.RemoveHouse a)
   <*> parseKeyword "house"
   <*> parseSpaces
   <*> parseString
+
 removeRoom :: Parser Lib1.RemoveCommand
 removeRoom = (\_ _ _ _ a _ _ _ b -> Lib1.RemoveRoom a b)
   <$> parseKeyword "remove"
@@ -235,6 +183,7 @@ removeRoom = (\_ _ _ _ a _ _ _ b -> Lib1.RemoveRoom a b)
   <*> parseKeyword "from"
   <*> parseSpaces
   <*> parseString
+
 removeDevice :: Parser Lib1.RemoveCommand
 removeDevice = (\_ _ _ _ a _ _ _ b -> Lib1.RemoveDevice a b)
   <$> parseKeyword "remove"
@@ -247,24 +196,9 @@ removeDevice = (\_ _ _ _ a _ _ _ b -> Lib1.RemoveDevice a b)
   <*> parseSpaces
   <*> parseString
 
--- BNF: <rename_command> ::= 
-      --   "rename house " <old_name> " to " <new_name> 
-      -- | "rename room " <old_name> " to " <new_name> 
-      -- | "rename device " <old_name> " to " <new_name>
-parseRename :: Parser Lib1.Command
-parseRename = Lib1.Rename <$> ExceptT (do
-  stateBefore <- get
-  result1 <- runExceptT renameHouse
-  case result1 of
-    Right x -> return (Right x)
-    Left _ -> do
-      put stateBefore
-      result2 <- runExceptT renameRoom
-      case result2 of
-        Right x -> return (Right x)
-        Left _ -> do
-          put stateBefore
-          runExceptT renameDevice)
+rename :: Parser Lib1.Command
+rename = Lib1.Rename <$> (renameHouse <|> renameRoom <|> renameDevice)
+
 renameHouse :: Parser Lib1.RenameCommand
 renameHouse = (\_ _ _ _ a _ _ _ b -> Lib1.RenameHouse a b)
   <$> parseKeyword "rename"
@@ -276,6 +210,7 @@ renameHouse = (\_ _ _ _ a _ _ _ b -> Lib1.RenameHouse a b)
   <*> parseKeyword "to"
   <*> parseSpaces
   <*> parseString
+
 renameRoom :: Parser Lib1.RenameCommand
 renameRoom = (\_ _ _ _ a _ _ _ b -> Lib1.RenameRoom a b)
   <$> parseKeyword "rename"
@@ -287,6 +222,7 @@ renameRoom = (\_ _ _ _ a _ _ _ b -> Lib1.RenameRoom a b)
   <*> parseKeyword "to"
   <*> parseSpaces
   <*> parseString
+
 renameDevice :: Parser Lib1.RenameCommand
 renameDevice = (\_ _ _ _ a _ _ _ b -> Lib1.RenameDevice a b)
   <$> parseKeyword "rename"
@@ -299,76 +235,43 @@ renameDevice = (\_ _ _ _ a _ _ _ b -> Lib1.RenameDevice a b)
   <*> parseSpaces
   <*> parseString
 
---BNF: <set_command> ::= 
-      --   "set device " <device_name> " brightness to " <value> 
-      -- | "set device " <device_name> " temperature to " <value> 
-      -- | "set device " <device_name> " state to " <state>
-parseSet :: Parser Lib1.Command
-parseSet = Lib1.Set <$> ExceptT (do
-  stateBefore <- get
-  result1 <- runExceptT setBrightness
-  case result1 of
-    Right x -> return (Right x)
-    Left _ -> do
-      put stateBefore
-      result2 <- runExceptT setTemperature
-      case result2 of
-        Right x -> return (Right x)
-        Left _ -> do
-          put stateBefore
-          runExceptT setState)
+set :: Parser Lib1.Command
+set = Lib1.Set <$> (setBrightness <|> setTemperature <|> setState)
+
 setBrightness :: Parser Lib1.SetCommand
-setBrightness = (\_ _ _ _ a _ _ _ _ _ b -> Lib1.SetBrightness a b)
+setBrightness = (\_ _ a _ _ _ b -> Lib1.SetBrightness a b)
   <$> parseKeyword "set"
-  <*> parseSpaces
-  <*> parseKeyword "device"
   <*> parseSpaces
   <*> parseString
   <*> parseSpaces
   <*> parseKeyword "brightness"
   <*> parseSpaces
-  <*> parseKeyword "to"
-  <*> parseSpaces
   <*> parseDouble
+
 setTemperature :: Parser Lib1.SetCommand
-setTemperature = (\_ _ _ _ a _ _ _ _ _ b -> Lib1.SetTemperature a b)
+setTemperature = (\_ _ a _ _ _ b -> Lib1.SetTemperature a b)
   <$> parseKeyword "set"
-  <*> parseSpaces
-  <*> parseKeyword "device"
   <*> parseSpaces
   <*> parseString
   <*> parseSpaces
   <*> parseKeyword "temperature"
   <*> parseSpaces
-  <*> parseKeyword "to"
-  <*> parseSpaces
   <*> parseDouble
+
 setState :: Parser Lib1.SetCommand
-setState = (\_ _ _ _ a _ _ _ _ _ b -> Lib1.SetState a b)
+setState = (\_ _ a _ _ _ b -> Lib1.SetState a b)
   <$> parseKeyword "set"
-  <*> parseSpaces
-  <*> parseKeyword "device"
   <*> parseSpaces
   <*> parseString
   <*> parseSpaces
   <*> parseKeyword "state"
   <*> parseSpaces
-  <*> parseKeyword "to"
-  <*> parseSpaces
   <*> parseState
 
--- BNF: <control_command> ::= 
-      --   "turn on " <device_name> 
-      -- | "turn off " <device_name>
-parseControl :: Parser Lib1.Command
-parseControl = Lib1.Control <$> ExceptT (do
-  stateBefore <- get
-  result1 <- runExceptT turnOn
-  case result1 of
-    Right x -> return (Right x)
-    Left _ -> do
-      put stateBefore
-      runExceptT turnOff)
+
+control :: Parser Lib1.Command
+control = Lib1.Control <$> (turnOn <|> turnOff)
+
 turnOn :: Parser Lib1.ControlCommand
 turnOn = (\_ _ _ _ a -> Lib1.TurnOn a)
   <$> parseKeyword "turn"
@@ -376,6 +279,7 @@ turnOn = (\_ _ _ _ a -> Lib1.TurnOn a)
   <*> parseKeyword "on"
   <*> parseSpaces
   <*> parseString
+
 turnOff :: Parser Lib1.ControlCommand
 turnOff = (\_ _ _ _ a -> Lib1.TurnOff a)
   <$> parseKeyword "turn"
@@ -384,9 +288,9 @@ turnOff = (\_ _ _ _ a -> Lib1.TurnOff a)
   <*> parseSpaces
   <*> parseString
 
--- BNF: <schedule_command> ::= "schedule " <device_name> <action> " " <value>
-parseSchedule :: Parser Lib1.Command
-parseSchedule = Lib1.Schedule <$> scheduleAt
+schedule :: Parser Lib1.Command
+schedule = Lib1.Schedule <$> scheduleAt
+
 scheduleAt :: Parser Lib1.ScheduleCommand
 scheduleAt = (\_ _ a _ b _ c -> Lib1.ScheduleAt a b c)
   <$> parseKeyword "schedule"
@@ -397,23 +301,9 @@ scheduleAt = (\_ _ a _ b _ c -> Lib1.ScheduleAt a b c)
   <*> parseSpaces
   <*> parseDouble
 
--- BNF: <report_command> ::= <report_house>
-                  --  | <report_room>
-                  --  | <report_device>
-parseReport :: Parser Lib1.Command
-parseReport =  Lib1.Report <$> ExceptT (do
-  stateBefore <- get
-  result1 <- runExceptT reportHouse
-  case result1 of
-    Right x -> return (Right x)
-    Left _ -> do
-      put stateBefore
-      result2 <- runExceptT reportRoom
-      case result2 of
-        Right x -> return (Right x)
-        Left _ -> do
-          put stateBefore
-          runExceptT reportDevice)
+report :: Parser Lib1.Command
+report = Lib1.Report <$> (reportHouse <|> reportRoom <|> reportDevice)
+
 reportHouse :: Parser Lib1.ReportCommand
 reportHouse =
   (\_ _ _ _ name _ reports -> Lib1.ReportHouse name reports)
@@ -424,6 +314,7 @@ reportHouse =
     <*> parseString
     <*> parseSpaces
     <*> parseReportList
+
 reportRoom :: Parser Lib1.ReportCommand
 reportRoom =
   (\_ _ _ _ name _ reports -> Lib1.ReportRoom name reports)
@@ -434,6 +325,7 @@ reportRoom =
     <*> parseString
     <*> parseSpaces
     <*> parseReportList
+
 reportDevice :: Parser Lib1.ReportCommand
 reportDevice =
   (\_ _ _ _ name -> Lib1.ReportDevice name)
@@ -443,47 +335,29 @@ reportDevice =
     <*> parseSpaces
     <*> parseString
 
--- Move parseReportList here, after report parsers are defined
 parseReportList :: Parser [Lib1.ReportCommand]
-parseReportList = many (ExceptT $ do
-  stateBefore <- get
-  result1 <- runExceptT reportHouse
-  case result1 of
-    Right x -> return (Right x)
-    Left _ -> do
-      put stateBefore
-      result2 <- runExceptT reportRoom
-      case result2 of
-        Right x -> return (Right x)
-        Left _ -> do
-          put stateBefore
-          runExceptT reportDevice)
+parseReportList = many (reportHouse <|> reportRoom <|> reportDevice)
 
--- BNF: <simulate_command> ::= "simulate day"
-parseSimulate :: Parser Lib1.Command
-parseSimulate = (\_ _ _ -> Lib1.Simulate Lib1.SimulateDay)
+simulate :: Parser Lib1.Command
+simulate = (\_ _ _ -> Lib1.Simulate Lib1.SimulateDay)
     <$> parseKeyword "simulate"
     <*> parseSpaces
     <*> parseKeyword "day"
 
--- Helper to generate positive doubles without scientific notation
+
 positiveDouble :: Gen Double
 positiveDouble = do
-  -- Generate positive doubles without scientific notation
-  -- Limit to reasonable range (0.1 to 1000) to avoid scientific notation
   intPart <- choose (1, 1000) :: Gen Int
   fracPart <- choose (0, 999) :: Gen Int
   let num = fromIntegral intPart + fromIntegral fracPart / 1000.0
   return num
 
--- Helper to generate non-empty strings (at least one letter)
 nonEmptyString :: Gen String
 nonEmptyString = do
   first <- elements ['a'..'z']
   rest <- listOf (elements ['a'..'z'])
   return (first : rest)
 
--- | This generates arbitrary (a.k.a random) commands for tests.
 instance Arbitrary Lib1.Command where
   arbitrary :: Gen Lib1.Command
   arbitrary = oneof [
@@ -528,7 +402,6 @@ instance Arbitrary Lib1.Command where
 
     pure (Lib1.Simulate Lib1.SimulateDay)]
 
--- Free Monad DSL
 data CommandAlgebra next = DumpCmd Lib1.Dumpable (() -> next)
                          | AddCmd Lib1.AddCommand (() -> next)
                          | RemoveCmd Lib1.RemoveCommand (() -> next)
@@ -553,30 +426,29 @@ instance Functor CommandAlgebra where
 
 type CommandDSL a = Free CommandAlgebra a
 
--- DSL methods
-dump :: Lib1.Dumpable -> CommandDSL ()
-dump d = Free (DumpCmd d Pure)
+dslDump :: Lib1.Dumpable -> CommandDSL ()
+dslDump d = Free (DumpCmd d Pure)
 
-add :: Lib1.AddCommand -> CommandDSL ()
-add cmd = Free (AddCmd cmd Pure)
+dslAdd :: Lib1.AddCommand -> CommandDSL ()
+dslAdd cmd = Free (AddCmd cmd Pure)
 
-remove :: Lib1.RemoveCommand -> CommandDSL ()
-remove cmd = Free (RemoveCmd cmd Pure)
+dslRemove :: Lib1.RemoveCommand -> CommandDSL ()
+dslRemove cmd = Free (RemoveCmd cmd Pure)
 
-set :: Lib1.SetCommand -> CommandDSL ()
-set cmd = Free (SetCmd cmd Pure)
+dslSet :: Lib1.SetCommand -> CommandDSL ()
+dslSet cmd = Free (SetCmd cmd Pure)
 
-rename :: Lib1.RenameCommand -> CommandDSL ()
-rename cmd = Free (RenameCmd cmd Pure)
+dslRename :: Lib1.RenameCommand -> CommandDSL ()
+dslRename cmd = Free (RenameCmd cmd Pure)
 
-control :: Lib1.ControlCommand -> CommandDSL ()
-control cmd = Free (ControlCmd cmd Pure)
+dslControl :: Lib1.ControlCommand -> CommandDSL ()
+dslControl cmd = Free (ControlCmd cmd Pure)
 
-schedule :: Lib1.ScheduleCommand -> CommandDSL ()
-schedule cmd = Free (ScheduleCmd cmd Pure)
+dslSchedule :: Lib1.ScheduleCommand -> CommandDSL ()
+dslSchedule cmd = Free (ScheduleCmd cmd Pure)
 
-report :: Lib1.ReportCommand -> CommandDSL String
-report cmd = Free (ReportCmd cmd Pure)
+dslReport :: Lib1.ReportCommand -> CommandDSL String
+dslReport cmd = Free (ReportCmd cmd Pure)
 
-simulate :: Lib1.SimulateCommand -> CommandDSL ()
-simulate cmd = Free (SimulateCmd cmd Pure)
+dslSimulate :: Lib1.SimulateCommand -> CommandDSL ()
+dslSimulate cmd = Free (SimulateCmd cmd Pure)
