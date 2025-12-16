@@ -25,17 +25,6 @@ type ErrorMsg = String
 type Input = String
 type Parser = ExceptT ErrorMsg (State Input)
 
-instance {-# OVERLAPPING #-} Alternative Parser where
-  empty = throwE "empty"
-  p <|> q = ExceptT $ do
-    stateBefore <- get
-    result <- runExceptT p
-    case result of
-      Left _ -> do
-        put stateBefore
-        runExceptT q
-      Right val -> return (Right val)
-
 parseKeyword :: String -> Parser String
 parseKeyword kw = do
     input <- lift get
@@ -85,9 +74,54 @@ parseDigit = do
         return h
       else throwE $ "A digit is expected, but got " ++ [h]
 
+instance {-# OVERLAPPING #-} Alternative Parser where
+  empty = throwE "empty" 
+  p <|> q = ExceptT $ do
+    stateBefore <- get
+    result <- runExceptT p
+    case result of
+      Left _ -> do
+        put stateBefore
+        runExceptT q
+      Right val -> return (Right val)
+
+--galima naudot 'helper' funkcija vietoj overlaping alternative:
+--infixl 3 <||>
+--(<||>) :: Parser a -> Parser a -> Parser a
+--p1 <||> p2 = ExceptT $ do
+--    s <- get
+--    result1 <- Control.Monad.Trans.Except.runExceptT p1
+--    case result1 of
+--        Right x -> return $ Right x
+--        Left _ -> do
+--            put s  -- resetina state
+--            Control.Monad.Trans.Except.runExceptT p2
+
+-- ir tada pvz parseAction (nes reikia nepamirsti state) butu:
+--parseAction :: Parser Lib1.Action
+--parseAction =
+--  ((\_ _ _ -> Lib1.TurnOnDevice)
+--    <$> parseKeyword "turn"
+--    <*> parseSpaces
+--    <*> parseKeyword "on") <||>
+--  ((\_ _ _ -> Lib1.TurnOffDevice)
+--    <$> parseKeyword "turn"
+--    <*> parseSpaces
+--    <*> parseKeyword "off") <||>
+--  ((\_ _ _ -> Lib1.SetBrightnessLevel)
+--    <$> parseKeyword "set"
+--    <*> parseSpaces
+--    <*> parseKeyword "brightness") <||>
+--  ((\_ _ _ -> Lib1.SetTemperatureLevel)
+--    <$> parseKeyword "set"
+--    <*> parseSpaces
+--    <*> parseKeyword "temperature")
+
 parseState :: Parser Lib1.State
 parseState = (Lib1.On <$ parseKeyword "on")
           <|> (Lib1.Off <$ parseKeyword "off")
+
+
 
 parseAction :: Parser Lib1.Action
 parseAction =
